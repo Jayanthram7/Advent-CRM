@@ -4,7 +4,7 @@ import ProtectedLayout from '@/components/ProtectedLayout';
 import TopBar from '@/components/TopBar';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import { Plus, X, Edit2, UserCheck, UserX, Trash2, KeyRound, Database } from 'lucide-react';
+import { Plus, X, Edit2, UserCheck, UserX, Trash2, KeyRound, Database, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface User {
@@ -23,13 +23,20 @@ const ROLE_CLASSES: Record<string, string> = {
 };
 
 function AdminSettingsModal({ onClose }: { onClose: () => void }) {
-  const [form, setForm] = useState({ username: '', password: '' });
+  const [form, setForm] = useState({ username: '', password: '', businessStartTime: '', businessEndTime: '' });
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
     api.get('/users/settings/credentials')
-      .then(res => { setForm({ username: res.data.username, password: res.data.password }); })
+      .then(res => { 
+        setForm({ 
+          username: res.data.username, 
+          password: res.data.password,
+          businessStartTime: res.data.businessStartTime || '09:30',
+          businessEndTime: res.data.businessEndTime || '17:30'
+        }); 
+      })
       .catch(() => toast.error('Failed to load settings'))
       .finally(() => setFetching(false));
   }, []);
@@ -73,6 +80,16 @@ function AdminSettingsModal({ onClose }: { onClose: () => void }) {
               <div className="form-group">
                 <label className="form-label">Password</label>
                 <input className="form-input" type="text" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div className="form-group">
+                  <label className="form-label">Business Start Time</label>
+                  <input className="form-input" type="time" value={form.businessStartTime} onChange={e => setForm(f => ({ ...f, businessStartTime: e.target.value }))} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Business End Time</label>
+                  <input className="form-input" type="time" value={form.businessEndTime} onChange={e => setForm(f => ({ ...f, businessEndTime: e.target.value }))} required />
+                </div>
               </div>
             </div>
             <div className="modal-footer">
@@ -231,6 +248,7 @@ export default function UsersPage() {
   const [tssModalOpen, setTssModalOpen] = useState(false);
   const [adminSettingsModalOpen, setAdminSettingsModalOpen] = useState(false);
   const [dailyOtp, setDailyOtp] = useState<string | null>(null);
+  const [otpRefreshing, setOtpRefreshing] = useState(false);
   const [loginLogs, setLoginLogs] = useState<any[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [filterDate, setFilterDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -243,6 +261,20 @@ export default function UsersPage() {
       setDailyOtp(res.data.otp);
     } catch (err) {
       console.error('Failed to fetch daily OTP');
+    }
+  };
+
+  const handleRefreshOtp = async () => {
+    if (!confirm('Are you sure you want to change the daily OTP? All users currently logging in will need the new code.')) return;
+    setOtpRefreshing(true);
+    try {
+      const res = await api.post('/auth/refresh-otp');
+      setDailyOtp(res.data.otp);
+      toast.success('OTP Refreshed Successfully');
+    } catch (err) {
+      toast.error('Failed to refresh OTP');
+    } finally {
+      setOtpRefreshing(false);
     }
   };
 
@@ -339,24 +371,47 @@ export default function UsersPage() {
               }}>
                 {dailyOtp}
               </div>
-              <button 
-                onClick={() => {
-                  navigator.clipboard.writeText(dailyOtp);
-                  toast.success('OTP copied to clipboard');
-                }}
-                style={{
-                  background: '#1a73e8',
-                  border: 'none',
-                  borderRadius: 10,
-                  padding: '10px 16px',
-                  color: 'white',
-                  fontWeight: 600,
-                  fontSize: 13,
-                  cursor: 'pointer'
-                }}
-              >
-                Copy Code
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button 
+                  onClick={handleRefreshOtp}
+                  disabled={otpRefreshing}
+                  title="Generate New OTP"
+                  style={{
+                    background: 'rgba(255,255,255,0.1)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: 10,
+                    padding: '10px',
+                    color: 'white',
+                    cursor: otpRefreshing ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                  onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                >
+                  <RefreshCw size={18} className={otpRefreshing ? 'animate-spin' : ''} />
+                </button>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(dailyOtp);
+                    toast.success('OTP copied to clipboard');
+                  }}
+                  style={{
+                    background: '#1a73e8',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '10px 16px',
+                    color: 'white',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Copy Code
+                </button>
+              </div>
             </div>
           </div>
         )}

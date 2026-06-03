@@ -66,7 +66,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex flex-col justify-between w-1/2 p-12 text-white">
         <div className="flex items-center gap-3">
           <div className="sidebar-logo-icon">A</div>
-          <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: 0.5 }}>Advent Leads</span>
+          <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: 0.5 }}>Advent CRM</span>
         </div>
         
         <div>
@@ -93,7 +93,7 @@ export default function LoginPage() {
         </div>
         
         <div style={{ color: '#475569', fontSize: 13 }}>
-          © 2024 Advent Leads. All rights reserved.
+          © 2024 Advent CRM. All rights reserved.
         </div>
       </div>
 
@@ -108,7 +108,7 @@ export default function LoginPage() {
           }}>
             <div className="flex items-center gap-2 mb-8 lg:hidden">
               <div className="sidebar-logo-icon">A</div>
-              <span style={{ fontWeight: 700, color: '#1a1f36' }}>Advent Leads</span>
+              <span style={{ fontWeight: 700, color: '#1a1f36' }}>Advent CRM</span>
             </div>
             
             <div className="mb-8">

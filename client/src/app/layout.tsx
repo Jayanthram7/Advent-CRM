@@ -7,8 +7,8 @@ import { Toaster } from 'react-hot-toast';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Advent Leads — Lead Management Platform',
-  description: 'Professional CRM and Lead Management Platform for modern sales teams',
+  title: 'Advent CRM — Customer Relationship Management',
+  description: 'Professional CRM Platform for modern sales teams',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

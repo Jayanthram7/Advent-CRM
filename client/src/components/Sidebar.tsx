@@ -136,7 +136,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="sidebar-logo">
         <div className="sidebar-logo-icon">A</div>
-        <span className="sidebar-logo-text">Advent Leads</span>
+        <span className="sidebar-logo-text">Advent CRM</span>
       </div>
 
       {/* Nav */}

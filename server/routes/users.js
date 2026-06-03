@@ -91,7 +91,7 @@ router.get('/settings/credentials', async (req, res) => {
   try {
     let setting = await AdminSetting.findOne({ type: 'credentials' });
     if (!setting) {
-      setting = await AdminSetting.create({ type: 'credentials', username: 'nithu', password: '181104' });
+      setting = await AdminSetting.create({ type: 'credentials', username: 'nithu', password: '181104', businessStartTime: '09:30', businessEndTime: '17:30' });
     }
     res.json(setting);
   } catch (err) { res.status(500).json({ message: 'Server error' }); }
@@ -100,14 +100,16 @@ router.get('/settings/credentials', async (req, res) => {
 // PUT /api/users/settings/credentials
 router.put('/settings/credentials', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, businessStartTime, businessEndTime } = req.body;
     let setting = await AdminSetting.findOne({ type: 'credentials' });
     if (setting) {
-      setting.username = username;
-      setting.password = password;
+      if (username) setting.username = username;
+      if (password) setting.password = password;
+      if (businessStartTime) setting.businessStartTime = businessStartTime;
+      if (businessEndTime) setting.businessEndTime = businessEndTime;
       await setting.save();
     } else {
-      setting = await AdminSetting.create({ type: 'credentials', username, password });
+      setting = await AdminSetting.create({ type: 'credentials', username, password, businessStartTime, businessEndTime });
     }
     res.json(setting);
   } catch (err) { res.status(500).json({ message: 'Server error' }); }

@@ -721,5 +721,35 @@ router.get('/:id/activities', async (req, res) => {
   }
 });
 
+// POST /api/leads/:id/whatsapp-log - Log WhatsApp outreach
+router.post('/:id/whatsapp-log', async (req, res) => {
+  try {
+    await Activity.create({
+      lead: req.params.id,
+      type: 'WhatsApp',
+      content: `WhatsApp outreach initiated by ${req.user.name}`,
+      performedBy: req.user._id
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error logging WhatsApp activity' });
+  }
+});
+
+
+// POST /api/leads/:id/email-log - Log Email outreach
+router.post('/:id/email-log', async (req, res) => {
+  try {
+    await Activity.create({
+      lead: req.params.id,
+      type: 'Email',
+      content: `Email outreach initiated by ${req.user.name}`,
+      performedBy: req.user._id
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error logging Email activity' });
+  }
+});
 
 module.exports = router;

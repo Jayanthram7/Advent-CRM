@@ -11,6 +11,14 @@ const adminSettingSchema = new mongoose.Schema({
   },
   password: {
     type: String
+  },
+  businessStartTime: {
+    type: String,
+    default: '09:30'
+  },
+  businessEndTime: {
+    type: String,
+    default: '17:30'
   }
 }, { timestamps: true });
 

@@ -9,17 +9,29 @@ const crypto = require('crypto');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
 
-// Helper to generate daily OTP
-const getDailyOTP = () => {
-  const date = new Date().toISOString().split('T')[0];
-  const secret = process.env.JWT_SECRET || 'fallback_secret';
-  const hash = crypto.createHmac('sha256', secret)
-    .update(date)
-    .digest('hex');
+// Helper to generate and persist daily OTP
+const ensureAndGetOTP = async (forceRefresh = false) => {
+  const AdminSetting = require('../models/AdminSetting');
+  let setting = await AdminSetting.findOne({ type: 'daily_otp' });
   
-  // Extract a 6-digit number from the hash
-  const otp = (parseInt(hash.substring(0, 8), 16) % 1000000).toString().padStart(6, '0');
-  return otp;
+  const today = new Date().toISOString().split('T')[0];
+  const lastUpdate = setting ? setting.updatedAt.toISOString().split('T')[0] : null;
+
+  if (!setting || forceRefresh || lastUpdate !== today) {
+    // Generate a truly random 6-digit OTP
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    if (!setting) {
+      setting = new AdminSetting({ type: 'daily_otp', password: newOtp });
+    } else {
+      setting.password = newOtp;
+      // Manually trigger updatedAt if it's the same day but forced refresh
+      setting.markModified('password');
+    }
+    await setting.save();
+    return newOtp;
+  }
+  
+  return setting.password;
 };
 
 
@@ -46,18 +58,27 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
     
-    // Check if within office hours for non-admins
+    // Check if within office hours for non-admins (Dynamic from DB)
     let isOutsideHours = false;
     if (user.role !== 'Admin') {
+      const AdminSetting = require('../models/AdminSetting');
+      const settings = await AdminSetting.findOne({ type: 'credentials' });
+      
+      const startTime = settings?.businessStartTime || '09:30';
+      const endTime = settings?.businessEndTime || '17:30';
+
+      const [startH, startM] = startTime.split(':').map(Number);
+      const [endH, endM] = endTime.split(':').map(Number);
+      
+      const startMinutesTotal = startH * 60 + startM;
+      const endMinutesTotal = endH * 60 + endM;
+
       const now = new Date();
       const hours = now.getHours();
       const minutes = now.getMinutes();
       const timeInMinutes = hours * 60 + minutes;
       
-      const startMinutes = 9 * 60 + 30; // 9:30 AM
-      const endMinutes = 17 * 60 + 30; // 5:30 PM
-      
-      if (timeInMinutes < startMinutes || timeInMinutes > endMinutes) {
+      if (timeInMinutes < startMinutesTotal || timeInMinutes > endMinutesTotal) {
         isOutsideHours = true;
       }
     }
@@ -124,7 +145,7 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    const currentOTP = getDailyOTP();
+    const currentOTP = await ensureAndGetOTP();
     if (otp !== currentOTP) {
       return res.status(401).json({ message: 'Invalid OTP' });
     }
@@ -162,12 +183,22 @@ router.post('/verify-otp', async (req, res) => {
 });
 
 // GET /api/auth/daily-otp - Admin only
-router.get('/daily-otp', authMiddleware, roleMiddleware('Admin'), (req, res) => {
+router.get('/daily-otp', authMiddleware, roleMiddleware('Admin'), async (req, res) => {
   try {
-    const otp = getDailyOTP();
+    const otp = await ensureAndGetOTP();
     res.json({ otp });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching daily OTP' });
+  }
+});
+
+// POST /api/auth/refresh-otp - Admin only
+router.post('/refresh-otp', authMiddleware, roleMiddleware('Admin'), async (req, res) => {
+  try {
+    const otp = await ensureAndGetOTP(true);
+    res.json({ otp, message: 'OTP refreshed successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error refreshing OTP' });
   }
 });
 

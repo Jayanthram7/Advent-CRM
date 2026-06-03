@@ -26,7 +26,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const isLoginRoute = error.config?.url?.includes('/auth/login');
-    if (error.response?.status === 401 && !isLoginRoute) {
+    if ((error.response?.status === 401 || (error.response?.status === 403 && error.response?.data?.logout)) && !isLoginRoute) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
         localStorage.removeItem('user');

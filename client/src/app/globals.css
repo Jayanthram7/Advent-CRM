@@ -472,6 +472,10 @@ body {
   to { transform: rotate(360deg); }
 }
 
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .sidebar { width: 0; overflow: hidden; }

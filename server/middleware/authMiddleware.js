@@ -21,6 +21,33 @@ const authMiddleware = async (req, res, next) => {
     if (user.status === 'Inactive') {
       return res.status(403).json({ message: 'Account is deactivated. Please contact admin.' });
     }
+
+    // Enforce business hours for non-admins (Dynamic from DB)
+    if (user.role !== 'Admin') {
+      const AdminSetting = require('../models/AdminSetting');
+      const settings = await AdminSetting.findOne({ type: 'credentials' });
+      
+      const startTime = settings?.businessStartTime || '09:30';
+      const endTime = settings?.businessEndTime || '17:30';
+
+      const [startH, startM] = startTime.split(':').map(Number);
+      const [endH, endM] = endTime.split(':').map(Number);
+      
+      const startMinutesTotal = startH * 60 + startM;
+      const endMinutesTotal = endH * 60 + endM;
+
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const timeInMinutes = hours * 60 + minutes;
+      
+      if (timeInMinutes < startMinutesTotal || timeInMinutes > endMinutesTotal) {
+        return res.status(403).json({ 
+          message: `Access denied. The platform is only available between ${startTime} and ${endTime}.`,
+          logout: true 
+        });
+      }
+    }
     
     req.user = user;
     next();

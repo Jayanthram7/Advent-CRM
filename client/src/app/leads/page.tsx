@@ -9,7 +9,7 @@ import {
   Plus, Search, Filter, ChevronLeft, ChevronRight,
   ChevronUp, ChevronDown, MoreVertical, Tag, Calendar,
   CheckCircle, FileText, Trash2, X, Phone, Mail,
-  MapPin, Building2, Hash, Globe, User, Clock, StickyNote
+  MapPin, Building2, Hash, Globe, User, Clock, StickyNote, MessageCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -123,6 +123,47 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
     }
   };
 
+  const handleWhatsApp = async () => {
+    if (!lead.phone) {
+      toast.error('No phone number available');
+      return;
+    }
+    
+    // Clean phone number (remove +, spaces, etc.)
+    const cleanPhone = lead.phone.replace(/\D/g, '');
+    const message = encodeURIComponent(`Hi ${lead.firstName}, this is from Advent Systems regarding your inquiry...`);
+    const waUrl = `https://wa.me/${cleanPhone}?text=${message}`;
+    
+    // Log activity in background
+    api.post(`/leads/${lead._id}/whatsapp-log`).then(() => {
+      fetchActivities();
+      onRefresh();
+    }).catch(() => {});
+
+    window.open(waUrl, '_blank');
+  };
+
+  const handleEmail = async () => {
+    if (!lead.email) {
+      toast.error('No email address available');
+      return;
+    }
+    
+    const subject = encodeURIComponent('Inquiry from Advent Systems');
+    const body = encodeURIComponent(`Hi ${lead.firstName},\n\nThis is regarding your inquiry with Advent Systems...`);
+    
+    // Direct Gmail compose link
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${lead.email}&su=${subject}&body=${body}`;
+    
+    // Log activity in background
+    api.post(`/leads/${lead._id}/email-log`).then(() => {
+      fetchActivities();
+      onRefresh();
+    }).catch(() => {});
+
+    window.open(gmailUrl, '_blank');
+  };
+
   const InfoRow = ({ icon, label, value }: { icon: React.ReactNode; label: string; value?: string }) => (
     value ? (
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '1px solid #f0f2f7' }}>
@@ -174,9 +215,62 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                 </div>
               </div>
             </div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4, borderRadius: 6 }}>
-              <X size={20} />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {lead.phone && (
+                <button 
+                  onClick={handleWhatsApp}
+                  title="Contact via WhatsApp"
+                  style={{ 
+                    background: '#25D366', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: 8, 
+                    padding: '8px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 4px 12px rgba(37, 211, 102, 0.25)'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                  onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                  <MessageCircle size={16} fill="white" />
+                  WhatsApp
+                </button>
+              )}
+              {lead.email && (
+                <button 
+                  onClick={handleEmail}
+                  title="Contact via Email"
+                  style={{ 
+                    background: '#EBF5FF', 
+                    color: '#0070F3', 
+                    border: '1px solid #D1E9FF', 
+                    borderRadius: 8, 
+                    padding: '8px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = '#D1E9FF'}
+                  onMouseOut={e => e.currentTarget.style.background = '#EBF5FF'}
+                >
+                  <Mail size={16} />
+                  Email
+                </button>
+              )}
+              <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4, borderRadius: 6 }}>
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
           {/* Tabs */}
@@ -348,7 +442,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                     <div key={act._id} style={{ display: 'flex', gap: 16, marginBottom: 24, position: 'relative', zIndex: 1 }}>
                       <div style={{ 
                         width: 16, height: 16, borderRadius: '50%', 
-                        background: act.type === 'Creation' ? '#10b981' : act.type === 'Conversion' ? '#8b5cf6' : '#e2e8f0',
+                        background: act.type === 'Creation' ? '#10b981' : act.type === 'Conversion' ? '#8b5cf6' : act.type === 'WhatsApp' ? '#25D366' : act.type === 'Email' ? '#0070F3' : '#e2e8f0',
                         border: '4px solid white', boxShadow: '0 0 0 1px #f0f2f7', flexShrink: 0, marginTop: 4
                       }} />
                       <div style={{ flex: 1 }}>

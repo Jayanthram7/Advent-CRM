@@ -12,7 +12,7 @@ const loginLogSchema = new mongoose.Schema({
   userAgent: String,
   status: {
     type: String,
-    enum: ['Success', 'Failed'],
+    enum: ['Success', 'Failed', 'OTP Pending', 'Blocked (Time)'],
     default: 'Success'
   }
 }, { timestamps: true });
