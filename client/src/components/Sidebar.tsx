@@ -6,7 +6,7 @@ import {
   Home, Users, Target, LogOut,
   ChevronDown, ChevronRight, Circle,
   Inbox, Clock, Calendar, CheckCircle2,
-  Database, Upload, FileText, X
+  Database, Upload, FileText, X, Phone
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -18,6 +18,14 @@ const LEAD_VIEWS = [
   { label: 'Completed',    href: '/leads?view=completed',    icon: CheckCircle2 },
 ];
 
+const CALL_VIEWS = [
+  { label: 'Open',         href: '/calls?view=open',         icon: Inbox },
+  { label: 'Follow Up',    href: '/calls?view=followup',     icon: Clock },
+  { label: 'Installation', href: '/calls?view=installation', icon: Calendar },
+  { label: 'Date Set',     href: '/calls?view=dateset',      icon: Calendar },
+  { label: 'Completed',    href: '/calls?view=completed',    icon: CheckCircle2 },
+];
+
 export default function Sidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -26,6 +34,9 @@ export default function Sidebar() {
 
   const isLeadsActive = pathname === '/leads' || pathname.startsWith('/leads/');
   const [leadsOpen, setLeadsOpen] = useState(isLeadsActive);
+
+  const isCallsActive = pathname === '/calls' || pathname.startsWith('/calls/');
+  const [callsOpen, setCallsOpen] = useState(isCallsActive);
 
   const isTssActive = pathname.startsWith('/tss');
   const [tssOpen, setTssOpen] = useState(isTssActive);
@@ -57,11 +68,16 @@ export default function Sidebar() {
     if (isLeadsActive) setLeadsOpen(true);
   }, [isLeadsActive]);
 
+  // Keep expanded if navigating between call sub-views
+  useEffect(() => {
+    if (isCallsActive) setCallsOpen(true);
+  }, [isCallsActive]);
+
   const currentView = searchParams.get('view');
 
-  const isSubActive = (href: string) => {
+  const isSubActive = (href: string, basePath: string) => {
     const view = href.split('view=')[1];
-    return pathname === '/leads' && currentView === view;
+    return pathname === basePath && currentView === view;
   };
 
   const handleTssClick = (e: React.MouseEvent) => {
@@ -180,7 +196,50 @@ export default function Sidebar() {
         {leadsOpen && (
           <div style={{ marginLeft: 0 }}>
             {LEAD_VIEWS.map(({ label, href, icon: Icon }) => {
-              const active = isSubActive(href);
+              const active = isSubActive(href, '/leads');
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`sidebar-item ${active ? 'active' : ''}`}
+                  style={{ paddingLeft: 38, fontSize: 13 }}
+                >
+                  <Icon size={13} style={{ opacity: active ? 1 : 0.6 }} />
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Calls parent row */}
+        <Link
+          href="/calls"
+          className={`sidebar-item ${isCallsActive && !currentView ? 'active' : ''}`}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 8 }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Phone size={15} />
+            Calls
+          </div>
+          <div
+            onClick={(e) => {
+              e.preventDefault();
+              setCallsOpen(o => !o);
+            }}
+            style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <span style={{ opacity: 0.5, transition: 'transform 0.2s', transform: callsOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
+              <ChevronDown size={13} />
+            </span>
+          </div>
+        </Link>
+
+        {/* Sub-items */}
+        {callsOpen && (
+          <div style={{ marginLeft: 0 }}>
+            {CALL_VIEWS.map(({ label, href, icon: Icon }) => {
+              const active = isSubActive(href, '/calls');
               return (
                 <Link
                   key={href}

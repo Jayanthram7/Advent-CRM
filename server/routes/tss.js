@@ -188,6 +188,17 @@ router.post('/records/:id/notes', async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Server error' }); }
 });
 
+// DELETE /api/tss/records/:id
+router.delete('/records/:id', async (req, res) => {
+  try {
+    const record = await TssRecord.findByIdAndDelete(req.params.id);
+    if (!record) return res.status(404).json({ message: 'Record not found' });
+    res.json({ message: 'Record deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // GET /api/tss/datasets/:id/analytics
 router.get('/datasets/:id/analytics', async (req, res) => {
   try {

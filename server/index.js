@@ -5,6 +5,7 @@ const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
 const leadRoutes = require('./routes/leads');
+const callRoutes = require('./routes/calls');
 const userRoutes = require('./routes/users');
 const noteRoutes = require('./routes/notes');
 const dashboardRoutes = require('./routes/dashboard');
@@ -20,6 +21,7 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadRoutes);
+app.use('/api/calls', callRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/dashboard', dashboardRoutes);

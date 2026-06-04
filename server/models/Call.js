@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const leadSchema = new mongoose.Schema({
+const callSchema = new mongoose.Schema({
   firstName: {
     type: String,
     required: true,
@@ -95,6 +95,6 @@ const leadSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Full text search index
-leadSchema.index({ firstName: 'text', lastName: 'text', email: 'text', company: 'text' });
+callSchema.index({ firstName: 'text', lastName: 'text', email: 'text', company: 'text' });
 
-module.exports = mongoose.model('Lead', leadSchema);
+module.exports = mongoose.model('Call', callSchema);

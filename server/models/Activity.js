@@ -3,8 +3,11 @@ const mongoose = require('mongoose');
 const activitySchema = new mongoose.Schema({
   lead: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Lead',
-    required: true
+    ref: 'Lead'
+  },
+  call: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Call'
   },
   type: {
     type: String,

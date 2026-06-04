@@ -15,7 +15,7 @@ import {
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 
-const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review'];
+const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Call', 'Cold Call', 'Review'];
 const SOURCE_OPTIONS = ['Website', 'Cold Call', 'Referral', 'Social Media', 'Email Campaign', 'Walk-in', 'Other'];
 
 const LABEL_CLASSES: Record<string, string> = {
@@ -24,12 +24,12 @@ const LABEL_CLASSES: Record<string, string> = {
   'Interested': 'badge badge-interested',
   'Not Interested': 'badge badge-not-interested',
   'Follow Up': 'badge badge-follow-up',
-  'Hot Lead': 'badge badge-hot-lead',
-  'Cold Lead': 'badge badge-cold-lead',
+  'Hot Call': 'badge badge-hot-call',
+  'Cold Call': 'badge badge-cold-call',
   'Review': 'badge badge-review',
 };
 
-interface Lead {
+interface Call {
   _id: string;
   firstName: string;
   lastName: string;
@@ -87,8 +87,8 @@ function getInitials(first: string, last: string) {
   return `${first?.[0] || ''}${last?.[0] || ''}`.toUpperCase();
 }
 
-// ─── Lead Detail Drawer ───────────────────────────────────────────────────────
-function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead: Lead; defaultTab?: 'details' | 'notes' | 'log'; onClose: () => void; onRefresh: (updatedLead?: Lead) => void }) {
+// ─── Call Detail Drawer ───────────────────────────────────────────────────────
+function CallDrawer({ call, defaultTab = 'details', onClose, onRefresh }: { call: Call; defaultTab?: 'details' | 'notes' | 'log'; onClose: () => void; onRefresh: (updatedCall?: Call) => void }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [newNote, setNewNote] = useState('');
@@ -98,39 +98,39 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
 
   const [isUpdatingFollowUp, setIsUpdatingFollowUp] = useState(false);
   const [newFollowUpDate, setNewFollowUpDate] = useState(
-    lead.followUpDate ? new Date(lead.followUpDate).toISOString().split('T')[0] : ''
+    call.followUpDate ? new Date(call.followUpDate).toISOString().split('T')[0] : ''
   );
   const [followUpNote, setFollowUpNote] = useState('');
   const [updatingFollowUpLoading, setUpdatingFollowUpLoading] = useState(false);
 
   const [isUpdatingCallback, setIsUpdatingCallback] = useState(false);
   const [newCallbackDate, setNewCallbackDate] = useState(
-    lead.callbackDate ? new Date(lead.callbackDate).toISOString().split('T')[0] : ''
+    call.callbackDate ? new Date(call.callbackDate).toISOString().split('T')[0] : ''
   );
   const [callbackNote, setCallbackNote] = useState('');
   const [updatingCallbackLoading, setUpdatingCallbackLoading] = useState(false);
 
   useEffect(() => {
-    setNewCallbackDate(lead.callbackDate ? new Date(lead.callbackDate).toISOString().split('T')[0] : '');
+    setNewCallbackDate(call.callbackDate ? new Date(call.callbackDate).toISOString().split('T')[0] : '');
     setCallbackNote('');
     setIsUpdatingCallback(false);
-    setNewFollowUpDate(lead.followUpDate ? new Date(lead.followUpDate).toISOString().split('T')[0] : '');
+    setNewFollowUpDate(call.followUpDate ? new Date(call.followUpDate).toISOString().split('T')[0] : '');
     setFollowUpNote('');
     setIsUpdatingFollowUp(false);
-  }, [lead]);
+  }, [call]);
 
 
   const fetchNotes = useCallback(() => {
-    api.get(`/leads/${lead._id}/notes`).then(r => setNotes(r.data)).catch(() => {});
-  }, [lead._id]);
+    api.get(`/calls/${call._id}/notes`).then(r => setNotes(r.data)).catch(() => {});
+  }, [call._id]);
 
   const fetchActivities = useCallback(() => {
     setActivitiesLoading(true);
-    api.get(`/leads/${lead._id}/activities`)
+    api.get(`/calls/${call._id}/activities`)
       .then(r => setActivities(r.data))
       .catch(() => {})
       .finally(() => setActivitiesLoading(false));
-  }, [lead._id]);
+  }, [call._id]);
 
   useEffect(() => {
     fetchNotes();
@@ -142,7 +142,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
     if (!newNote.trim()) return;
     setNotesLoading(true);
     try {
-      await api.post(`/leads/${lead._id}/notes`, { content: newNote });
+      await api.post(`/calls/${call._id}/notes`, { content: newNote });
       fetchNotes();
       fetchActivities();
       setNewNote('');
@@ -156,18 +156,18 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
   };
 
   const handleWhatsApp = async () => {
-    if (!lead.phone) {
+    if (!call.phone) {
       toast.error('No phone number available');
       return;
     }
     
     // Clean phone number (remove +, spaces, etc.)
-    const cleanPhone = lead.phone.replace(/\D/g, '');
-    const message = encodeURIComponent(`Hi ${lead.firstName}, this is from Advent Systems regarding your inquiry...`);
+    const cleanPhone = call.phone.replace(/\D/g, '');
+    const message = encodeURIComponent(`Hi ${call.firstName}, this is from Advent Systems regarding your inquiry...`);
     const waUrl = `https://wa.me/${cleanPhone}?text=${message}`;
     
     // Log activity in background
-    api.post(`/leads/${lead._id}/whatsapp-log`).then(() => {
+    api.post(`/calls/${call._id}/whatsapp-log`).then(() => {
       fetchActivities();
       onRefresh();
     }).catch(() => {});
@@ -176,19 +176,19 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
   };
 
   const handleEmail = async () => {
-    if (!lead.email) {
+    if (!call.email) {
       toast.error('No email address available');
       return;
     }
     
     const subject = encodeURIComponent('Inquiry from Advent Systems');
-    const body = encodeURIComponent(`Hi ${lead.firstName},\n\nThis is regarding your inquiry with Advent Systems...`);
+    const body = encodeURIComponent(`Hi ${call.firstName},\n\nThis is regarding your inquiry with Advent Systems...`);
     
     // Direct Gmail compose link
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${lead.email}&su=${subject}&body=${body}`;
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${call.email}&su=${subject}&body=${body}`;
     
     // Log activity in background
-    api.post(`/leads/${lead._id}/email-log`).then(() => {
+    api.post(`/calls/${call._id}/email-log`).then(() => {
       fetchActivities();
       onRefresh();
     }).catch(() => {});
@@ -232,23 +232,23 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 17, fontWeight: 700, color: 'white', flexShrink: 0
               }}>
-                {getInitials(lead.firstName, lead.lastName)}
+                {getInitials(call.firstName, call.lastName)}
               </div>
               <div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1f36' }}>
-                  {lead.firstName} {lead.lastName}
+                  {call.firstName} {call.lastName}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                  {lead.isConverted && <span className="badge badge-converted" style={{ fontSize: 11 }}>Converted</span>}
-                  {lead.status && !lead.isConverted && <span className="badge badge-open" style={{ fontSize: 11 }}>{lead.status}</span>}
-                  {(lead.labels || []).map(l => (
+                  {call.isConverted && <span className="badge badge-converted" style={{ fontSize: 11 }}>Converted</span>}
+                  {call.status && !call.isConverted && <span className="badge badge-open" style={{ fontSize: 11 }}>{call.status}</span>}
+                  {(call.labels || []).map(l => (
                     <span key={l} className={LABEL_CLASSES[l] || 'badge'} style={{ fontSize: 11 }}>{l}</span>
                   ))}
                 </div>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {lead.phone && (
+              {call.phone && (
                 <button 
                   onClick={handleWhatsApp}
                   title="Contact via WhatsApp"
@@ -274,7 +274,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                   WhatsApp
                 </button>
               )}
-              {lead.email && (
+              {call.email && (
                 <button 
                   onClick={handleEmail}
                   title="Contact via Email"
@@ -328,7 +328,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
           {activeTab === 'details' && (
             <div style={{ paddingTop: 8 }}>
               {/* Callback date callout */}
-              {lead.callbackDate && (
+              {call.callbackDate && (
                 <div style={{
                   background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '1px solid #bfdbfe',
                   borderRadius: 10, padding: '16px', margin: '16px 0',
@@ -340,7 +340,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                       <div>
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Callback Date</div>
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1f36', marginTop: 1 }}>
-                          {format(new Date(lead.callbackDate), 'EEEE, MMMM d, yyyy')}
+                          {format(new Date(call.callbackDate), 'EEEE, MMMM d, yyyy')}
                         </div>
                       </div>
                     </div>
@@ -412,7 +412,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                           }
                           setUpdatingCallbackLoading(true);
                           try {
-                            const res = await api.post(`/leads/${lead._id}/date`, {
+                            const res = await api.post(`/calls/${call._id}/date`, {
                               callbackDate: newCallbackDate,
                               note: callbackNote
                             });
@@ -447,11 +447,11 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                     </div>
                   )}
 
-                  {lead.followUpHistory && lead.followUpHistory.length > 0 && (
+                  {call.followUpHistory && call.followUpHistory.length > 0 && (
                     <div style={{ marginTop: 6, borderTop: '1px solid rgba(29, 78, 216, 0.15)', paddingTop: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>History</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
-                        {lead.followUpHistory.map((history, idx) => (
+                        {call.followUpHistory.map((history, idx) => (
                           <div key={idx} style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(29, 78, 216, 0.1)', borderRadius: 6, padding: 8 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, fontSize: 11, fontWeight: 500, color: '#1d4ed8' }}>
                               <span>{format(new Date(history.date), 'MMM d, yyyy')}</span>
@@ -467,7 +467,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                   )}
                 </div>
               )}
-              {lead.followUpDate && (
+              {call.followUpDate && (
                 <div style={{
                   background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', border: '1px solid #fde68a',
                   borderRadius: 10, padding: '16px', marginBottom: 16,
@@ -479,7 +479,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                       <div>
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Follow-up Date</div>
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1f36', marginTop: 1 }}>
-                          {format(new Date(lead.followUpDate), 'EEEE, MMMM d, yyyy')}
+                          {format(new Date(call.followUpDate), 'EEEE, MMMM d, yyyy')}
                         </div>
                       </div>
                     </div>
@@ -551,7 +551,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                           }
                           setUpdatingFollowUpLoading(true);
                           try {
-                            const res = await api.post(`/leads/${lead._id}/date`, {
+                            const res = await api.post(`/calls/${call._id}/date`, {
                               followUpDate: newFollowUpDate,
                               note: followUpNote
                             });
@@ -586,11 +586,11 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                     </div>
                   )}
 
-                  {lead.followUpHistory && lead.followUpHistory.length > 0 && (
+                  {call.followUpHistory && call.followUpHistory.length > 0 && (
                     <div style={{ marginTop: 6, borderTop: '1px solid rgba(180, 83, 9, 0.15)', paddingTop: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>History</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
-                        {lead.followUpHistory.map((history, idx) => (
+                        {call.followUpHistory.map((history, idx) => (
                           <div key={idx} style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(180, 83, 9, 0.1)', borderRadius: 6, padding: 8 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, fontSize: 11, fontWeight: 500, color: '#b45309' }}>
                               <span>{format(new Date(history.date), 'MMM d, yyyy')}</span>
@@ -606,7 +606,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                   )}
                 </div>
               )}
-              {lead.installationDate && (
+              {call.installationDate && (
                 <div style={{
                   background: 'linear-gradient(135deg, #f0fdf4, #bbf7d0)', border: '1px solid #86efac',
                   borderRadius: 10, padding: '12px 16px', marginBottom: 16,
@@ -616,34 +616,34 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 600, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Installation Date</div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1f36', marginTop: 1 }}>
-                      {format(new Date(lead.installationDate), 'EEEE, MMMM d, yyyy')}
+                      {format(new Date(call.installationDate), 'EEEE, MMMM d, yyyy')}
                     </div>
                   </div>
                 </div>
               )}
 
-              <div style={{ paddingTop: lead.callbackDate || lead.followUpDate || lead.installationDate ? 0 : 16 }}>
-                <InfoRow icon={<Mail size={15} />} label="Email" value={lead.email} />
-                <InfoRow icon={<FileText size={15} />} label="Reason" value={lead.reason} />
-                <InfoRow icon={<Phone size={15} />} label="Phone" value={lead.phone} />
-                <InfoRow icon={<Phone size={15} />} label="Secondary Phone" value={lead.secondaryPhone} />
-                <InfoRow icon={<Building2 size={15} />} label="Company" value={lead.company} />
-                <InfoRow icon={<Hash size={15} />} label="License Number" value={lead.licenseNumber} />
-                <InfoRow icon={<Globe size={15} />} label="Lead Source" value={lead.leadSource} />
-                <InfoRow icon={<MapPin size={15} />} label="Address" value={lead.address} />
-                <InfoRow icon={<MapPin size={15} />} label="City" value={lead.city} />
-                <InfoRow icon={<MapPin size={15} />} label="Country" value={lead.country} />
-                <InfoRow icon={<User size={15} />} label="Status" value={lead.status} />
+              <div style={{ paddingTop: call.callbackDate || call.followUpDate || call.installationDate ? 0 : 16 }}>
+                <InfoRow icon={<Mail size={15} />} label="Email" value={call.email} />
+                <InfoRow icon={<FileText size={15} />} label="Reason" value={call.reason} />
+                <InfoRow icon={<Phone size={15} />} label="Phone" value={call.phone} />
+                <InfoRow icon={<Phone size={15} />} label="Secondary Phone" value={call.secondaryPhone} />
+                <InfoRow icon={<Building2 size={15} />} label="Company" value={call.company} />
+                <InfoRow icon={<Hash size={15} />} label="License Number" value={call.licenseNumber} />
+                <InfoRow icon={<Globe size={15} />} label="Call Source" value={call.leadSource} />
+                <InfoRow icon={<MapPin size={15} />} label="Address" value={call.address} />
+                <InfoRow icon={<MapPin size={15} />} label="City" value={call.city} />
+                <InfoRow icon={<MapPin size={15} />} label="Country" value={call.country} />
+                <InfoRow icon={<User size={15} />} label="Status" value={call.status} />
                 <InfoRow
                   icon={<Clock size={15} />}
                   label="Created"
-                  value={format(new Date(lead.createdAt), 'MMMM d, yyyy • h:mm a')}
+                  value={format(new Date(call.createdAt), 'MMMM d, yyyy • h:mm a')}
                 />
-                {lead.convertedAt && (
+                {call.convertedAt && (
                   <InfoRow
                     icon={<CheckCircle size={15} />}
                     label="Converted On"
-                    value={format(new Date(lead.convertedAt), 'MMMM d, yyyy • h:mm a')}
+                    value={format(new Date(call.convertedAt), 'MMMM d, yyyy • h:mm a')}
                   />
                 )}
               </div>
@@ -657,7 +657,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                 <textarea
                   value={newNote}
                   onChange={e => setNewNote(e.target.value)}
-                  placeholder="Write a note about this lead..."
+                  placeholder="Write a note about this call..."
                   rows={3}
                   style={{
                     width: '100%', border: '1px solid #e5e7eb', borderRadius: 8,
@@ -747,8 +747,8 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
   );
 }
 
-// ─── Create Lead Modal ───────────────────────────────────────────────────────
-function CreateLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+// ─── Create Call Modal ───────────────────────────────────────────────────────
+function CreateCallModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
     secondaryPhone: '', company: '', licenseNumber: '',
@@ -764,13 +764,13 @@ function CreateLeadModal({ onClose, onCreated }: { onClose: () => void; onCreate
     }
     setLoading(true);
     try {
-      await api.post('/leads', form);
-      toast.success('Lead created successfully!');
+      await api.post('/calls', form);
+      toast.success('Call created successfully!');
       onCreated();
       onClose();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
-      toast.error(error?.response?.data?.message || 'Failed to create lead');
+      toast.error(error?.response?.data?.message || 'Failed to create call');
     } finally {
       setLoading(false);
     }
@@ -782,7 +782,7 @@ function CreateLeadModal({ onClose, onCreated }: { onClose: () => void; onCreate
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ maxWidth: 680 }}>
         <div className="modal-header">
-          <h2 className="modal-title">Create New Lead</h2>
+          <h2 className="modal-title">Create New Call</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -817,7 +817,7 @@ function CreateLeadModal({ onClose, onCreated }: { onClose: () => void; onCreate
                 <input className="form-input" value={form.licenseNumber} onChange={e => set('licenseNumber', e.target.value)} placeholder="LIC-12345" />
               </div>
               <div className="form-group">
-                <label className="form-label">Lead Source</label>
+                <label className="form-label">Call Source</label>
                 <select className="form-select" value={form.leadSource} onChange={e => set('leadSource', e.target.value)}>
                   {SOURCE_OPTIONS.map(s => <option key={s}>{s}</option>)}
                 </select>
@@ -842,7 +842,7 @@ function CreateLeadModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <div className="modal-footer">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? <><div className="spinner" style={{ width: 16, height: 16 }} /> Creating...</> : <><Plus size={15} />Create Lead</>}
+              {loading ? <><div className="spinner" style={{ width: 16, height: 16 }} /> Creating...</> : <><Plus size={15} />Create Call</>}
             </button>
           </div>
         </form>
@@ -852,21 +852,21 @@ function CreateLeadModal({ onClose, onCreated }: { onClose: () => void; onCreate
 }
 
 // ─── Note Panel ──────────────────────────────────────────────────────────────
-function NotePanel({ leadId, onClose }: { leadId: string; onClose: () => void }) {
+function NotePanel({ callId, onClose }: { callId: string; onClose: () => void }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [newNote, setNewNote] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.get(`/leads/${leadId}/notes`).then(r => setNotes(r.data)).catch(() => {});
-  }, [leadId]);
+    api.get(`/calls/${callId}/notes`).then(r => setNotes(r.data)).catch(() => {});
+  }, [callId]);
 
   const addNote = async () => {
     if (!newNote.trim()) return;
     setLoading(true);
     try {
-      await api.post(`/leads/${leadId}/notes`, { content: newNote });
-      const r = await api.get(`/leads/${leadId}/notes`);
+      await api.post(`/calls/${callId}/notes`, { content: newNote });
+      const r = await api.get(`/calls/${callId}/notes`);
       setNotes(r.data);
       setNewNote('');
       toast.success('Note added');
@@ -907,12 +907,12 @@ function NotePanel({ leadId, onClose }: { leadId: string; onClose: () => void })
 }
 
 // ─── Row Actions Menu ─────────────────────────────────────────────────────────
-function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void; users: any[] }) {
+function RowMenu({ call, onRefresh, users }: { call: Call; onRefresh: () => void; users: any[] }) {
   const { isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [submenu, setSubmenu] = useState<'labels' | 'date_followup' | 'date_install' | 'note' | 'assign' | null>(null);
 
-  const [selectedLabels, setSelectedLabels] = useState<string[]>(lead.labels || []);
+  const [selectedLabels, setSelectedLabels] = useState<string[]>(call.labels || []);
   const [date, setDate] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -924,9 +924,9 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
       return;
     }
     try {
-      await api.put(`/leads/${lead._id}`, { assignedTo: adminUser._id });
-      await api.post(`/leads/${lead._id}/labels`, { labels: ['Review'] });
-      toast.success('Lead assigned to Admin for review');
+      await api.put(`/calls/${call._id}`, { assignedTo: adminUser._id });
+      await api.post(`/calls/${call._id}/labels`, { labels: ['Review'] });
+      toast.success('Call assigned to Admin for review');
       onRefresh();
       setOpen(false);
     } catch {
@@ -942,7 +942,7 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
 
   const saveLabels = async () => {
     try {
-      await api.post(`/leads/${lead._id}/labels`, { labels: selectedLabels });
+      await api.post(`/calls/${call._id}/labels`, { labels: selectedLabels });
       toast.success('Labels updated');
       onRefresh();
       setOpen(false);
@@ -951,39 +951,39 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
 
   const saveDate = async (type: 'followUpDate' | 'installationDate') => {
     try {
-      await api.post(`/leads/${lead._id}/date`, { [type]: date });
+      await api.post(`/calls/${call._id}/date`, { [type]: date });
       toast.success('Date set');
       onRefresh();
       setOpen(false);
     } catch { toast.error('Failed to set date'); }
   };
 
-  const assignLead = async (userId: string) => {
+  const assignCall = async (userId: string) => {
     try {
-      await api.put(`/leads/${lead._id}`, { assignedTo: userId });
-      toast.success('Lead assigned');
+      await api.put(`/calls/${call._id}`, { assignedTo: userId });
+      toast.success('Call assigned');
       onRefresh();
       setOpen(false);
-    } catch { toast.error('Failed to assign lead'); }
+    } catch { toast.error('Failed to assign call'); }
   };
 
 
-  const convertLead = async () => {
+  const convertCall = async () => {
     try {
-      await api.post(`/leads/${lead._id}/convert`);
-      toast.success('Lead marked as converted!');
+      await api.post(`/calls/${call._id}/convert`);
+      toast.success('Call marked as converted!');
       onRefresh();
       setOpen(false);
-    } catch { toast.error('Failed to convert lead'); }
+    } catch { toast.error('Failed to convert call'); }
   };
 
-  const deleteLead = async () => {
-    if (!confirm('Delete this lead? This cannot be undone.')) return;
+  const deleteCall = async () => {
+    if (!confirm('Delete this call? This cannot be undone.')) return;
     try {
-      await api.delete(`/leads/${lead._id}`);
-      toast.success('Lead deleted');
+      await api.delete(`/calls/${call._id}`);
+      toast.success('Call deleted');
       onRefresh();
-    } catch { toast.error('Failed to delete lead'); }
+    } catch { toast.error('Failed to delete call'); }
   };
 
   return (
@@ -1009,14 +1009,14 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
               ) : (
                 <div className="dropdown-item" onClick={askReview}><User size={14} />Ask Review</div>
               )}
-              {!lead.isConverted && (
-                <div className="dropdown-item" onClick={convertLead}><CheckCircle size={14} />Mark as Converted</div>
+              {!call.isConverted && (
+                <div className="dropdown-item" onClick={convertCall}><CheckCircle size={14} />Mark as Converted</div>
               )}
               <div className="dropdown-item" onClick={() => { setSubmenu('note'); setOpen(false); setNoteOpen(true); }}><FileText size={14} />Add Note</div>
               {isAdmin && (
                 <>
                   <div style={{ height: 1, background: '#f0f2f7', margin: '4px 0' }} />
-                  <div className="dropdown-item danger" onClick={deleteLead}><Trash2 size={14} />Delete Lead</div>
+                  <div className="dropdown-item danger" onClick={deleteCall}><Trash2 size={14} />Delete Call</div>
                 </>
               )}
             </>
@@ -1072,12 +1072,12 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
                   <div 
                     key={u._id} 
                     className="dropdown-item" 
-                    onClick={() => assignLead(u._id)}
+                    onClick={() => assignCall(u._id)}
                     style={{ 
                       fontSize: 13, 
                       padding: '8px 10px',
-                      background: lead.assignedTo?._id === u._id ? '#f0f7ff' : 'transparent',
-                      color: lead.assignedTo?._id === u._id ? '#1a73e8' : 'inherit'
+                      background: call.assignedTo?._id === u._id ? '#f0f7ff' : 'transparent',
+                      color: call.assignedTo?._id === u._id ? '#1a73e8' : 'inherit'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1091,7 +1091,7 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
                         <div>{u.name}</div>
                         <div style={{ fontSize: 10, color: '#9ca3af' }}>{u.role}</div>
                       </div>
-                      {lead.assignedTo?._id === u._id && <CheckCircle size={12} />}
+                      {call.assignedTo?._id === u._id && <CheckCircle size={12} />}
                     </div>
                   </div>
                 ))}
@@ -1107,29 +1107,29 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
 
       {noteOpen && (
         <div style={{ position: 'absolute', right: 0, top: '100%', width: 320, zIndex: 300 }}>
-          <NotePanel leadId={lead._id} onClose={() => setNoteOpen(false)} />
+          <NotePanel callId={call._id} onClose={() => setNoteOpen(false)} />
         </div>
       )}
     </div>
   );
 }
 
-// ─── Main Leads Page ──────────────────────────────────────────────────────────
-function LeadsPageContent() {
+// ─── Main Calls Page ──────────────────────────────────────────────────────────
+function CallsPageContent() {
   const { isAdmin } = useAuth();
   const searchParams = useSearchParams();
   const urlView = searchParams.get('view'); // open | followup | dateset | installation | completed
 
   const VIEW_TITLES: Record<string, string> = {
-    open: 'Open Leads',
-    followup: 'Follow Up Leads',
-    dateset: 'Date Set Leads',
-    installation: 'Installation Leads',
-    completed: 'Completed Leads',
+    open: 'Open Calls',
+    followup: 'Follow Up Calls',
+    dateset: 'Date Set Calls',
+    installation: 'Installation Calls',
+    completed: 'Completed Calls',
   };
-  const pageTitle = urlView ? (VIEW_TITLES[urlView] || 'Leads') : 'All Leads';
+  const pageTitle = urlView ? (VIEW_TITLES[urlView] || 'Calls') : 'All Calls';
 
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [calls, setCalls] = useState<Call[]>([]);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
   const [page, setPage] = useState(1);
@@ -1142,7 +1142,7 @@ function LeadsPageContent() {
   const [filterSource, setFilterSource] = useState('');
   const [filterLabel, setFilterLabel] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedCall, setSelectedCall] = useState<Call | null>(null);
   const [drawerTab, setDrawerTab] = useState<'details' | 'notes' | 'log'>('details');
   const [users, setUsers] = useState<any[]>([]);
 
@@ -1155,7 +1155,7 @@ function LeadsPageContent() {
   // Reset page when view changes
   useEffect(() => { setPage(1); setSearch(''); }, [urlView]);
 
-  const fetchLeads = useCallback(async () => {
+  const fetchCalls = useCallback(async () => {
     setLoading(true);
     try {
       const params: Record<string, string> = { page: String(page), limit: '25', sortBy, sortOrder };
@@ -1170,18 +1170,18 @@ function LeadsPageContent() {
       if (urlView === 'installation') { params.installation = 'true'; }
       if (urlView === 'completed')    { params.converted = 'true'; }
 
-      const res = await api.get('/leads', { params });
-      setLeads(res.data.leads);
+      const res = await api.get('/calls', { params });
+      setCalls(res.data.calls);
       setTotal(res.data.total);
       setPages(res.data.pages);
     } catch {
-      toast.error('Failed to fetch leads');
+      toast.error('Failed to fetch calls');
     } finally {
       setLoading(false);
     }
   }, [page, search, sortBy, sortOrder, filterSource, filterLabel, urlView]);
 
-  useEffect(() => { fetchLeads(); }, [fetchLeads]);
+  useEffect(() => { fetchCalls(); }, [fetchCalls]);
 
   const toggleSort = (col: string) => {
     if (sortBy === col) setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
@@ -1195,11 +1195,11 @@ function LeadsPageContent() {
   );
 
   const toggleSelect = (id: string) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  const toggleAll = () => setSelectedIds(prev => prev.length === leads.length ? [] : leads.map(l => l._id));
+  const toggleAll = () => setSelectedIds(prev => prev.length === calls.length ? [] : calls.map(l => l._id));
 
   return (
     <ProtectedLayout>
-      <TopBar title={pageTitle} onRefresh={fetchLeads}>
+      <TopBar title={pageTitle} onRefresh={fetchCalls}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {isAdmin && (
             <button
@@ -1228,7 +1228,7 @@ function LeadsPageContent() {
             </button>
           )}
           <button className="btn-secondary" onClick={() => setShowFilter(!showFilter)}><Filter size={14} />Filter</button>
-          <button className="btn-primary" onClick={() => setShowCreate(true)}><Plus size={15} />Create Lead</button>
+          <button className="btn-primary" onClick={() => setShowCreate(true)}><Plus size={15} />Create Call</button>
         </div>
       </TopBar>
 
@@ -1242,7 +1242,7 @@ function LeadsPageContent() {
             </div>
 
             <div className="form-group" style={{ marginBottom: 14 }}>
-              <label className="form-label">Lead Source</label>
+              <label className="form-label">Call Source</label>
               <select className="form-select" value={filterSource} onChange={e => { setFilterSource(e.target.value); setPage(1); }}>
                 <option value="">All Sources</option>
                 {SOURCE_OPTIONS.map(s => <option key={s}>{s}</option>)}
@@ -1269,9 +1269,9 @@ function LeadsPageContent() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div style={{ position: 'relative' }}>
               <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-              <input className="search-bar" placeholder="Search leads..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+              <input className="search-bar" placeholder="Search calls..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
             </div>
-            <span style={{ fontSize: 13, color: '#6b7280' }}>{total} leads</span>
+            <span style={{ fontSize: 13, color: '#6b7280' }}>{total} calls</span>
             {selectedIds.length > 0 && (
               <span style={{ fontSize: 13, color: '#1a73e8', fontWeight: 500 }}>{selectedIds.length} selected</span>
             )}
@@ -1280,21 +1280,21 @@ function LeadsPageContent() {
           {/* Table */}
           <div className="card" style={{ padding: 0 }}>
             {loading ? (
-              <div className="empty-state"><div className="spinner spinner-dark" style={{ width: 32, height: 32 }} /><p>Loading leads...</p></div>
-            ) : leads.length === 0 ? (
+              <div className="empty-state"><div className="spinner spinner-dark" style={{ width: 32, height: 32 }} /><p>Loading calls...</p></div>
+            ) : calls.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon"><Search size={28} color="#9ca3af" /></div>
-                <p style={{ fontWeight: 600, color: '#374151' }}>No leads found</p>
-                <p style={{ fontSize: 13 }}>Create your first lead or adjust your filters</p>
-                <button className="btn-primary" onClick={() => setShowCreate(true)}><Plus size={14} />Create Lead</button>
+                <p style={{ fontWeight: 600, color: '#374151' }}>No calls found</p>
+                <p style={{ fontSize: 13 }}>Create your first call or adjust your filters</p>
+                <button className="btn-primary" onClick={() => setShowCreate(true)}><Plus size={14} />Create Call</button>
               </div>
             ) : (
               <div>
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 40 }}><input type="checkbox" checked={selectedIds.length === leads.length} onChange={toggleAll} /></th>
-                      <th onClick={() => toggleSort('firstName')} style={{ cursor: 'pointer' }}>Lead Name <SortIcon col="firstName" /></th>
+                      <th style={{ width: 40 }}><input type="checkbox" checked={selectedIds.length === calls.length} onChange={toggleAll} /></th>
+                      <th onClick={() => toggleSort('firstName')} style={{ cursor: 'pointer' }}>Call Name <SortIcon col="firstName" /></th>
                       <th onClick={() => toggleSort('company')} style={{ cursor: 'pointer' }}>Company <SortIcon col="company" /></th>
                       <th>Reason</th>
                       <th>Phone</th>
@@ -1307,48 +1307,49 @@ function LeadsPageContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {leads.map(lead => (
-                      <tr key={lead._id} onClick={() => setSelectedLead(lead)}>
-                        <td onClick={e => e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(lead._id)} onChange={() => toggleSelect(lead._id)} /></td>
+                    {calls.map(call => (
+                      <tr key={call._id} onClick={() => setSelectedCall(call)}>
+                        <td onClick={e => e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(call._id)} onChange={() => toggleSelect(call._id)} /></td>
                         <td>
-                          <div style={{ fontWeight: 500 }}>{lead.firstName} {lead.lastName}</div>
+                          <div style={{ fontWeight: 500 }}>{call.firstName} {call.lastName}</div>
                         </td>
-                        <td>{lead.company || '—'}</td>
-                        <td style={{ color: '#6b7280', fontSize: 13 }}>{lead.reason || '—'}</td>
-                        <td>{lead.phone || '—'}</td>
-                        <td>{lead.licenseNumber || '—'}</td>
+                        <td>{call.company || '—'}</td>
+                        <td style={{ color: '#6b7280', fontSize: 13 }}>{call.reason || '—'}</td>
+                        <td>{call.phone || '—'}</td>
+                        <td>{call.licenseNumber || '—'}</td>
                         <td>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            {lead.isConverted ? (
+                            {call.isConverted ? (
                               <span className="badge badge-converted">Converted</span>
                             ) : (
-                              (lead.labels || []).map(l => (
+                              (call.labels || []).map(l => (
                                 <span key={l} className={LABEL_CLASSES[l] || 'badge'}>{l}</span>
                               ))
                             )}
                           </div>
                         </td>
                         <td>
-                          {lead.assignedTo ? (
+                          {call.assignedTo ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <div style={{ 
                                 width: 22, height: 22, borderRadius: '50%', background: '#e0e7ff', color: '#4338ca',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700
                               }}>
-                                {lead.assignedTo.name.split(' ').map(n => n[0]).join('')}
+                                {call.assignedTo.name.split(' ').map(n => n[0]).join('')}
                               </div>
-                              <span style={{ fontSize: 12.5, color: '#374151' }}>{lead.assignedTo.name}</span>
+                              <span style={{ fontSize: 12.5, color: '#374151' }}>{call.assignedTo.name}</span>
                             </div>
                           ) : (
                             <span style={{ color: '#9ca3af', fontSize: 12.5 }}>Unassigned</span>
                           )}
                         </td>
                         <td style={{ whiteSpace: 'nowrap', color: '#6b7280', fontSize: 12.5 }}>
-                          {format(new Date(lead.createdAt), 'MMM d, yyyy')}
+
+                          {format(new Date(call.createdAt), 'MMM d, yyyy')}
                         </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {lead.installationDate ? (
+                            {call.installationDate ? (
                               <div style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 5,
                                 background: '#f0fdf4', border: '1px solid #bbf7d0',
@@ -1356,10 +1357,10 @@ function LeadsPageContent() {
                               }}>
                                 <Calendar size={11} style={{ color: '#166534', flexShrink: 0 }} />
                                 <span style={{ fontSize: 11, fontWeight: 600, color: '#166534' }}>
-                                  {format(new Date(lead.installationDate), 'MMM d')}
+                                  {format(new Date(call.installationDate), 'MMM d')}
                                 </span>
                               </div>
-                            ) : lead.followUpDate ? (
+                            ) : call.followUpDate ? (
                               <div style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 5,
                                 background: '#fffbeb', border: '1px solid #fde68a',
@@ -1367,10 +1368,10 @@ function LeadsPageContent() {
                               }}>
                                 <Clock size={11} style={{ color: '#b45309', flexShrink: 0 }} />
                                 <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309' }}>
-                                  {format(new Date(lead.followUpDate), 'MMM d')}
+                                  {format(new Date(call.followUpDate), 'MMM d')}
                                 </span>
                               </div>
-                            ) : lead.callbackDate ? (
+                            ) : call.callbackDate ? (
                               <div style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 5,
                                 background: '#eff6ff', border: '1px solid #bfdbfe',
@@ -1378,25 +1379,26 @@ function LeadsPageContent() {
                               }}>
                                 <Calendar size={11} style={{ color: '#1d4ed8', flexShrink: 0 }} />
                                 <span style={{ fontSize: 11, fontWeight: 600, color: '#1d4ed8' }}>
-                                  {format(new Date(lead.callbackDate), 'MMM d')}
+                                  {format(new Date(call.callbackDate), 'MMM d')}
                                 </span>
                               </div>
                             ) : null}
 
-                            {(lead.noteCount || 0) > 0 && (
+                            {(call.noteCount || 0) > 0 && (
                               <button 
-                                onClick={(e) => { e.stopPropagation(); setSelectedLead(lead); setDrawerTab('notes'); }}
+                                onClick={(e) => { e.stopPropagation(); setSelectedCall(call); setDrawerTab('notes'); }}
                                 style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', padding: '3px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
-                                title={`${lead.noteCount} Note(s)`}
+                                title={`${call.noteCount} Note(s)`}
                               >
-                                <FileText size={12} /> {lead.noteCount}
+                                <FileText size={12} /> {call.noteCount}
                               </button>
                             )}
                           </div>
                         </td>
                         <td onClick={e => e.stopPropagation()}>
-                          <RowMenu lead={lead} onRefresh={fetchLeads} users={users} />
+                          <RowMenu call={call} onRefresh={fetchCalls} users={users} />
                         </td>
+
                       </tr>
                     ))}
                   </tbody>
@@ -1422,15 +1424,15 @@ function LeadsPageContent() {
         </div>
       </div>
 
-      {showCreate && <CreateLeadModal onClose={() => setShowCreate(false)} onCreated={fetchLeads} />}
-      {selectedLead && (
-        <LeadDrawer
-          lead={selectedLead}
+      {showCreate && <CreateCallModal onClose={() => setShowCreate(false)} onCreated={fetchCalls} />}
+      {selectedCall && (
+        <CallDrawer
+          call={selectedCall}
           defaultTab={drawerTab}
-          onClose={() => { setSelectedLead(null); setDrawerTab('details'); }}
-          onRefresh={(updatedLead) => {
-            fetchLeads();
-            if (updatedLead) setSelectedLead(updatedLead);
+          onClose={() => { setSelectedCall(null); setDrawerTab('details'); }}
+          onRefresh={(updatedCall) => {
+            fetchCalls();
+            if (updatedCall) setSelectedCall(updatedCall);
           }}
         />
       )}
@@ -1439,7 +1441,7 @@ function LeadsPageContent() {
   );
 }
 
-export default function LeadsPage() {
+export default function CallsPage() {
   return (
     <Suspense fallback={
       <div className="empty-state">
@@ -1447,7 +1449,7 @@ export default function LeadsPage() {
         <p>Loading...</p>
       </div>
     }>
-      <LeadsPageContent />
+      <CallsPageContent />
     </Suspense>
   );
 }

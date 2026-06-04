@@ -4,7 +4,7 @@ import ProtectedLayout from '@/components/ProtectedLayout';
 import TopBar from '@/components/TopBar';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import { ChevronLeft, ChevronRight, X, FileText, Search, Database, MoreVertical, Tag, Clock, Calendar, CheckCircle, BarChart3, Filter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, FileText, Search, Database, MoreVertical, Tag, Clock, Calendar, CheckCircle, BarChart3, Filter, Trash2, RefreshCw } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { format } from 'date-fns';
 
@@ -91,6 +91,16 @@ function RowMenu({ record, onRefresh }: { record: TssRecord; onRefresh: () => vo
     } catch { toast.error('Failed to add note'); }
   };
 
+  const deleteRecord = async () => {
+    if (!confirm('Delete this TSS record? This cannot be undone.')) return;
+    try {
+      await api.delete(`/tss/records/${record._id}`);
+      toast.success('Record deleted');
+      onRefresh();
+      setOpen(false);
+    } catch { toast.error('Failed to delete record'); }
+  };
+
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
@@ -111,6 +121,8 @@ function RowMenu({ record, onRefresh }: { record: TssRecord; onRefresh: () => vo
                 <div className="dropdown-item" onClick={e => { e.stopPropagation(); closeRecord(); }}><CheckCircle size={14} />Mark as Closed</div>
               )}
               <div className="dropdown-item" onClick={e => { e.stopPropagation(); setNoteOpen(true); }}><FileText size={14} />Add Note</div>
+              <div style={{ height: 1, background: '#f0f2f7', margin: '4px 0' }} />
+              <div className="dropdown-item danger" onClick={e => { e.stopPropagation(); deleteRecord(); }}><Trash2 size={14} />Delete Record</div>
             </>
           )}
 
@@ -319,6 +331,28 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
   const [totalRecords, setTotalRecords] = useState(0);
   const [search, setSearch] = useState('');
   const [viewFilter, setViewFilter] = useState(''); // open, followup, closed, dateset
+  const [tickedIds, setTickedIds] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (id) {
+      const saved = localStorage.getItem(`ticked_records_${id}`);
+      if (saved) {
+        try {
+          setTickedIds(JSON.parse(saved));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  }, [id]);
+
+  const handleToggleTick = (recordId: string) => {
+    setTickedIds(prev => {
+      const next = { ...prev, [recordId]: !prev[recordId] };
+      localStorage.setItem(`ticked_records_${id}`, JSON.stringify(next));
+      return next;
+    });
+  };
   
   const [selectedRecord, setSelectedRecord] = useState<TssRecord | null>(null);
   const [drawerTab, setDrawerTab] = useState<'details' | 'notes'>('details');
@@ -392,6 +426,19 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
             </div>
 
             <button
+              onClick={() => {
+                setTickedIds({});
+                localStorage.removeItem(`ticked_records_${id}`);
+                fetchRecords(page, search, viewFilter);
+                toast.success('All records unticked');
+              }}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px' }}
+            >
+              <RefreshCw size={15} /> Refresh & Untick
+            </button>
+
+            <button
               onClick={() => setShowAnalytics(true)}
               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
             >
@@ -407,6 +454,7 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 10, boxShadow: '0 1px 0 #e2e8f0' }}>
                   <tr>
+                    <th style={{ padding: '12px 12px', width: 40 }}></th>
                     <th style={{ padding: '12px 12px', fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', width: 280 }}>Customer Name</th>
                     <th style={{ padding: '12px 12px', fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Mobile Number</th>
                     <th style={{ padding: '12px 12px', fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Serial Number</th>
@@ -418,10 +466,10 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Loading records...</td></tr>
+                    <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Loading records...</td></tr>
                   ) : records.length === 0 ? (
                     <tr>
-                      <td colSpan={7} style={{ padding: 60, textAlign: 'center' }}>
+                      <td colSpan={8} style={{ padding: 60, textAlign: 'center' }}>
                         <div style={{ width: 48, height: 48, background: '#f1f5f9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
                           <FileText size={20} style={{ color: '#94a3b8' }} />
                         </div>
@@ -435,6 +483,14 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
                         style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? 'white' : '#fcfcfd', cursor: 'pointer', transition: 'background 0.15s' }}
                         onMouseOver={e => e.currentTarget.style.background = '#f1f5f9'} onMouseOut={e => e.currentTarget.style.background = i % 2 === 0 ? 'white' : '#fcfcfd'}
                       >
+                        <td style={{ padding: '12px 12px', width: 40 }} onClick={e => e.stopPropagation()}>
+                          <input 
+                            type="checkbox" 
+                            checked={!!tickedIds[r._id]} 
+                            onChange={() => handleToggleTick(r._id)} 
+                            style={{ cursor: 'pointer' }}
+                          />
+                        </td>
                         <td style={{ padding: '12px 12px' }}>
                           <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13.5, maxWidth: 260, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.customerName || '-'}>
                             {r.customerName || '-'}

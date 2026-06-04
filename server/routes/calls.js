@@ -1,10 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const Lead = require('../models/Lead');
+const Call = require('../models/Call');
 const Note = require('../models/Note');
 const Activity = require('../models/Activity');
 const { Resend } = require('resend');
-
 
 const resend = new Resend('re_LSfRqxrV_9dAg5rmMmoe6kHDJxzBCkThR');
 const authMiddleware = require('../middleware/authMiddleware');
@@ -12,7 +11,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 // All routes require authentication
 router.use(authMiddleware);
 
-// GET /api/leads - list leads with filters and pagination
+// GET /api/calls - list calls with filters and pagination
 router.get('/', async (req, res) => {
   try {
     const {
@@ -28,7 +27,7 @@ router.get('/', async (req, res) => {
 
     let query = {};
 
-    // Role-based filtering: Agents only see their assigned leads
+    // Role-based filtering: Agents only see their assigned calls
     if (req.user.role === 'Agent') {
       query.assignedTo = req.user._id;
     }
@@ -45,7 +44,7 @@ router.get('/', async (req, res) => {
       query.labels = { $in: label.split(',') };
     }
 
-    // Date set filter (leads with a callbackDate or followUp or installation)
+    // Date set filter (calls with a callbackDate or followUp or installation)
     if (req.query.dateSet === 'true') {
       query.callbackDate = { $exists: true, $ne: null };
     }
@@ -95,23 +94,23 @@ router.get('/', async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const [leads, total] = await Promise.all([
-      Lead.find(query)
+    const [calls, total] = await Promise.all([
+      Call.find(query)
         .sort(sortOptions)
         .skip(skip)
         .limit(parseInt(limit))
         .populate('assignedTo', 'name email')
         .populate('createdBy', 'name email'),
-      Lead.countDocuments(query)
+      Call.countDocuments(query)
     ]);
 
-    const leadsWithNotes = await Promise.all(leads.map(async (lead) => {
-      const noteCount = await Note.countDocuments({ lead: lead._id });
-      return { ...lead.toObject(), noteCount };
+    const callsWithNotes = await Promise.all(calls.map(async (call) => {
+      const noteCount = await Note.countDocuments({ call: call._id });
+      return { ...call.toObject(), noteCount };
     }));
 
     res.json({
-      leads: leadsWithNotes,
+      calls: callsWithNotes,
       total,
       page: parseInt(page),
       pages: Math.ceil(total / parseInt(limit)),
@@ -119,12 +118,12 @@ router.get('/', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Get leads error:', err);
-    res.status(500).json({ message: 'Server error fetching leads' });
+    console.error('Get calls error:', err);
+    res.status(500).json({ message: 'Server error fetching calls' });
   }
 });
 
-// POST /api/leads - create lead
+// POST /api/calls - create call
 router.post('/', async (req, res) => {
   try {
     const {
@@ -136,7 +135,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'First name and last name are required' });
     }
 
-    const lead = await Lead.create({
+    const call = await Call.create({
       firstName,
       lastName,
       email,
@@ -156,14 +155,14 @@ router.post('/', async (req, res) => {
 
     // Log Activity: Creation
     await Activity.create({
-      lead: lead._id,
+      call: call._id,
       type: 'Creation',
-      content: `Lead created by ${req.user.name}`,
+      content: `Call created by ${req.user.name}`,
       performedBy: req.user._id
     });
 
 
-    // Send Welcome Email if lead has an email address
+    // Send Welcome Email if call has an email address
     if (email) {
       try {
         await resend.emails.send({
@@ -508,7 +507,7 @@ router.post('/', async (req, res) => {
 
 </body>
 </html>
-          `
+`
         });
         console.log(`Welcome email sent to ${email}`);
       } catch (emailErr) {
@@ -516,24 +515,24 @@ router.post('/', async (req, res) => {
       }
     }
 
-    res.status(201).json(lead);
+    res.status(201).json(call);
   } catch (err) {
-    console.error('Create lead error:', err);
-    res.status(500).json({ message: 'Server error creating lead' });
+    console.error('Create call error:', err);
+    res.status(500).json({ message: 'Server error creating call' });
   }
 });
 
-// PUT /api/leads/:id - update lead
+// PUT /api/calls/:id - update call
 router.put('/:id', async (req, res) => {
   try {
-    const lead = await Lead.findByIdAndUpdate(
+    const call = await Call.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true, runValidators: true }
     );
 
-    if (!lead) {
-      return res.status(404).json({ message: 'Lead not found' });
+    if (!call) {
+      return res.status(404).json({ message: 'Call not found' });
     }
 
     // Log Activity if assignedTo changed
@@ -541,74 +540,74 @@ router.put('/:id', async (req, res) => {
       const User = require('../models/User');
       const assignedUser = await User.findById(req.body.assignedTo);
       await Activity.create({
-        lead: lead._id,
+        call: call._id,
         type: 'Assignment',
-        content: `Lead assigned to ${assignedUser ? assignedUser.name : 'Unknown User'} by ${req.user.name}`,
+        content: `Call assigned to ${assignedUser ? assignedUser.name : 'Unknown User'} by ${req.user.name}`,
         performedBy: req.user._id
       });
     } else {
       await Activity.create({
-        lead: lead._id,
+        call: call._id,
         type: 'Update',
-        content: `Lead details updated by ${req.user.name}`,
+        content: `Call details updated by ${req.user.name}`,
         performedBy: req.user._id
       });
     }
 
-    res.json(lead);
+    res.json(call);
 
   } catch (err) {
-    console.error('Update lead error:', err);
-    res.status(500).json({ message: 'Server error updating lead' });
+    console.error('Update call error:', err);
+    res.status(500).json({ message: 'Server error updating call' });
   }
 });
 
-// DELETE /api/leads/:id
+// DELETE /api/calls/:id
 router.delete('/:id', async (req, res) => {
   try {
-    const lead = await Lead.findByIdAndDelete(req.params.id);
-    if (!lead) {
-      return res.status(404).json({ message: 'Lead not found' });
+    const call = await Call.findByIdAndDelete(req.params.id);
+    if (!call) {
+      return res.status(404).json({ message: 'Call not found' });
     }
     // Also delete associated notes
-    await Note.deleteMany({ lead: req.params.id });
-    res.json({ message: 'Lead deleted successfully' });
+    await Note.deleteMany({ call: req.params.id });
+    res.json({ message: 'Call deleted successfully' });
   } catch (err) {
-    console.error('Delete lead error:', err);
-    res.status(500).json({ message: 'Server error deleting lead' });
+    console.error('Delete call error:', err);
+    res.status(500).json({ message: 'Server error deleting call' });
   }
 });
 
-// POST /api/leads/:id/labels - add/update labels
+// POST /api/calls/:id/labels - add/update labels
 router.post('/:id/labels', async (req, res) => {
   try {
     const { labels } = req.body;
-    const lead = await Lead.findByIdAndUpdate(
+    const call = await Call.findByIdAndUpdate(
       req.params.id,
       { labels },
       { new: true }
     );
-    if (!lead) return res.status(404).json({ message: 'Lead not found' });
+    if (!call) return res.status(404).json({ message: 'Call not found' });
     
     // Log Activity: Labels
     await Activity.create({
-      lead: lead._id,
+      call: call._id,
       type: 'Label',
       content: `Labels updated to: ${labels.join(', ')} by ${req.user.name}`,
       performedBy: req.user._id
     });
 
-    res.json(lead);
+    res.json(call);
 
   } catch (err) {
     res.status(500).json({ message: 'Server error updating labels' });
   }
 });
 
-// POST /api/leads/:id/convert - mark as converted
+// POST /api/calls/:id/convert - mark as converted
 router.post('/:id/convert', async (req, res) => {
   try {
-    const lead = await Lead.findByIdAndUpdate(
+    const call = await Call.findByIdAndUpdate(
       req.params.id,
       { 
         isConverted: true,
@@ -617,24 +616,24 @@ router.post('/:id/convert', async (req, res) => {
       },
       { new: true }
     );
-    if (!lead) return res.status(404).json({ message: 'Lead not found' });
+    if (!call) return res.status(404).json({ message: 'Call not found' });
 
     // Log Activity: Conversion
     await Activity.create({
-      lead: lead._id,
+      call: call._id,
       type: 'Conversion',
-      content: `Lead marked as Converted by ${req.user.name}`,
+      content: `Call marked as Converted by ${req.user.name}`,
       performedBy: req.user._id
     });
 
-    res.json(lead);
+    res.json(call);
 
   } catch (err) {
-    res.status(500).json({ message: 'Server error converting lead' });
+    res.status(500).json({ message: 'Server error converting call' });
   }
 });
 
-// POST /api/leads/:id/notes - add note
+// POST /api/calls/:id/notes - add note
 router.post('/:id/notes', async (req, res) => {
   try {
     const { content } = req.body;
@@ -643,7 +642,7 @@ router.post('/:id/notes', async (req, res) => {
     }
 
     const note = await Note.create({
-      lead: req.params.id,
+      call: req.params.id,
       content: content.trim(),
       author: req.user._id,
       authorName: req.user.name
@@ -651,7 +650,7 @@ router.post('/:id/notes', async (req, res) => {
 
     // Log Activity: Note
     await Activity.create({
-      lead: req.params.id,
+      call: req.params.id,
       type: 'Note',
       content: `New note added by ${req.user.name}: "${content.substring(0, 50)}${content.length > 50 ? '...' : ''}"`,
       performedBy: req.user._id
@@ -664,10 +663,10 @@ router.post('/:id/notes', async (req, res) => {
   }
 });
 
-// GET /api/leads/:id/notes - get notes for a lead
+// GET /api/calls/:id/notes - get notes for a call
 router.get('/:id/notes', async (req, res) => {
   try {
-    const notes = await Note.find({ lead: req.params.id })
+    const notes = await Note.find({ call: req.params.id })
       .sort({ createdAt: -1 })
       .populate('author', 'name email');
     res.json(notes);
@@ -676,27 +675,27 @@ router.get('/:id/notes', async (req, res) => {
   }
 });
 
-// POST /api/leads/:id/date - set callback/followup date
+// POST /api/calls/:id/date - set callback/followup date
 router.post('/:id/date', async (req, res) => {
   try {
     const { callbackDate, followUpDate, installationDate, note } = req.body;
     
-    const lead = await Lead.findById(req.params.id);
-    if (!lead) return res.status(404).json({ message: 'Lead not found' });
+    const call = await Call.findById(req.params.id);
+    if (!call) return res.status(404).json({ message: 'Call not found' });
 
     if (callbackDate !== undefined) {
-      lead.callbackDate = callbackDate ? new Date(callbackDate) : null;
+      call.callbackDate = callbackDate ? new Date(callbackDate) : null;
     }
     if (followUpDate !== undefined) {
-      lead.followUpDate = followUpDate ? new Date(followUpDate) : null;
+      call.followUpDate = followUpDate ? new Date(followUpDate) : null;
     }
     if (installationDate !== undefined) {
-      lead.installationDate = installationDate ? new Date(installationDate) : null;
+      call.installationDate = installationDate ? new Date(installationDate) : null;
     }
 
     if (note && note.trim()) {
-      lead.followUpHistory = lead.followUpHistory || [];
-      lead.followUpHistory.unshift({
+      call.followUpHistory = call.followUpHistory || [];
+      call.followUpHistory.unshift({
         date: callbackDate || followUpDate || installationDate || new Date(),
         note: note.trim(),
         updatedBy: req.user.name,
@@ -704,20 +703,20 @@ router.post('/:id/date', async (req, res) => {
       });
     }
 
-    await lead.save();
+    await call.save();
 
     // Log Activity: Date update
     const dateVal = callbackDate || followUpDate || installationDate;
     const dateType = callbackDate ? 'Callback' : followUpDate ? 'Follow-up' : 'Installation';
     const noteText = note ? ` (Note: ${note})` : '';
     await Activity.create({
-      lead: lead._id,
+      call: call._id,
       type: 'DateUpdate',
       content: `${dateType} date set to ${formatDate(dateVal)} by ${req.user.name}${noteText}`,
       performedBy: req.user._id
     });
 
-    res.json(lead);
+    res.json(call);
   } catch (err) {
     console.error('Set date error:', err);
     res.status(500).json({ message: 'Server error setting date' });
@@ -730,10 +729,10 @@ function formatDate(date) {
   return new Date(date).toLocaleDateString();
 }
 
-// GET /api/leads/:id/activities - get activity log
+// GET /api/calls/:id/activities - get activity log
 router.get('/:id/activities', async (req, res) => {
   try {
-    const activities = await Activity.find({ lead: req.params.id })
+    const activities = await Activity.find({ call: req.params.id })
       .sort({ createdAt: -1 })
       .populate('performedBy', 'name email');
     res.json(activities);
@@ -742,11 +741,11 @@ router.get('/:id/activities', async (req, res) => {
   }
 });
 
-// POST /api/leads/:id/whatsapp-log - Log WhatsApp outreach
+// POST /api/calls/:id/whatsapp-log - Log WhatsApp outreach
 router.post('/:id/whatsapp-log', async (req, res) => {
   try {
     await Activity.create({
-      lead: req.params.id,
+      call: req.params.id,
       type: 'WhatsApp',
       content: `WhatsApp outreach initiated by ${req.user.name}`,
       performedBy: req.user._id
@@ -757,12 +756,11 @@ router.post('/:id/whatsapp-log', async (req, res) => {
   }
 });
 
-
-// POST /api/leads/:id/email-log - Log Email outreach
+// POST /api/calls/:id/email-log - Log Email outreach
 router.post('/:id/email-log', async (req, res) => {
   try {
     await Activity.create({
-      lead: req.params.id,
+      call: req.params.id,
       type: 'Email',
       content: `Email outreach initiated by ${req.user.name}`,
       performedBy: req.user._id
