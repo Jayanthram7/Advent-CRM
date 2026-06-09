@@ -70,9 +70,11 @@ mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 15000 })
     console.error('══════════════════════════════════════════════════════════════');
   });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Backend running → http://localhost:${PORT}`);
-  console.log(`   Health: http://localhost:${PORT}/api/health`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Backend running → http://localhost:${PORT}`);
+    console.log(`   Health: http://localhost:${PORT}/api/health`);
+  });
+}
 
 module.exports = app;
