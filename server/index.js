@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
+mongoose.set('bufferCommands', false);
 const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
@@ -15,9 +16,43 @@ const tssRoutes = require('./routes/tss');
 const app = express();
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    process.env.CLIENT_URL,
+    'https://advent-leads.vercel.app'
+  ].filter(Boolean),
   credentials: true
 }));
+
+let dbPromise = null;
+const connectDB = async () => {
+  if (mongoose.connection.readyState >= 1) return;
+  if (!dbPromise) {
+    dbPromise = mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000
+    }).then(async (m) => {
+      console.log('✅ MongoDB connected');
+      await seedAdmin();
+      return m;
+    }).catch(err => {
+      dbPromise = null;
+      console.error('❌ MongoDB connection failed:', err.message);
+      throw err;
+    });
+  }
+  return dbPromise;
+};
+
+app.use(async (req, res, next) => {
+  if (req.path === '/api/health') return next();
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    res.status(500).json({ message: 'Database connection failed', error: err.message });
+  }
+});
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
@@ -53,28 +88,15 @@ async function seedAdmin() {
   }
 }
 
-mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 15000 })
-  .then(() => {
-    console.log('✅ MongoDB connected');
-    seedAdmin();
-  })
-  .catch(err => {
-    console.error('❌ MongoDB connection failed:', err.message);
-    console.error('');
-    console.error('══════════════════════════════════════════════════════════════');
-    console.error('  ACTION REQUIRED — Add your IP to MongoDB Atlas:');
-    console.error('  1. Go to https://cloud.mongodb.com');
-    console.error('  2. Security → Network Access → Add IP Address');
-    console.error('  3. Select "Allow Access From Anywhere" (0.0.0.0/0)');
-    console.error('  4. Save, wait ~30s, then restart this server');
-    console.error('══════════════════════════════════════════════════════════════');
-  });
+// Database connection and seeding are now handled dynamically by request middleware
 
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`🚀 Backend running → http://localhost:${PORT}`);
     console.log(`   Health: http://localhost:${PORT}/api/health`);
   });
+  // Eagerly connect to MongoDB in local development for diagnostic logging
+  connectDB().catch(() => {});
 }
 
 module.exports = app;
