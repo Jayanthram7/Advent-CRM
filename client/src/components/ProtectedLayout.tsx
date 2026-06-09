@@ -10,7 +10,7 @@ interface ProtectedLayoutProps {
 }
 
 export default function ProtectedLayout({ children, requiredRole }: ProtectedLayoutProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, sidebarCollapsed } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function ProtectedLayout({ children, requiredRole }: ProtectedLay
   return (
     <>
       <Sidebar />
-      <div className="main-layout">
+      <div className={`main-layout ${sidebarCollapsed ? 'collapsed' : ''}`}>
         {children}
       </div>
     </>

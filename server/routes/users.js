@@ -9,7 +9,6 @@ const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
 
 router.use(authMiddleware);
-router.use(roleMiddleware('Admin'));
 
 // GET /api/users
 router.get('/', async (req, res) => {
@@ -20,6 +19,8 @@ router.get('/', async (req, res) => {
     res.status(500).json({ message: 'Server error fetching users' });
   }
 });
+
+router.use(roleMiddleware('Admin'));
 
 // POST /api/users
 router.post('/', async (req, res) => {

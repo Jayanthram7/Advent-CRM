@@ -722,7 +722,7 @@ function CallDrawer({ call, defaultTab = 'details', onClose, onRefresh }: { call
                     <div key={act._id} style={{ display: 'flex', gap: 16, marginBottom: 24, position: 'relative', zIndex: 1 }}>
                       <div style={{ 
                         width: 16, height: 16, borderRadius: '50%', 
-                        background: act.type === 'Creation' ? '#10b981' : act.type === 'Conversion' ? '#8b5cf6' : act.type === 'WhatsApp' ? '#25D366' : act.type === 'Email' ? '#0070F3' : '#e2e8f0',
+                        background: act.type === 'Creation' ? '#10b981' : act.type === 'Conversion' ? '#8b5cf6' : act.type === 'WhatsApp' ? '#25D366' : act.type === 'Email' ? '#0070F3' : act.type === 'DateUpdate' ? '#f59e0b' : '#e2e8f0',
                         border: '4px solid white', boxShadow: '0 0 0 1px #f0f2f7', flexShrink: 0, marginTop: 4
                       }} />
                       <div style={{ flex: 1 }}>
@@ -1116,7 +1116,7 @@ function RowMenu({ call, onRefresh, users }: { call: Call; onRefresh: () => void
 
 // ─── Main Calls Page ──────────────────────────────────────────────────────────
 function CallsPageContent() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, sidebarCollapsed } = useAuth();
   const searchParams = useSearchParams();
   const urlView = searchParams.get('view'); // open | followup | dateset | installation | completed
 
@@ -1145,6 +1145,8 @@ function CallsPageContent() {
   const [selectedCall, setSelectedCall] = useState<Call | null>(null);
   const [drawerTab, setDrawerTab] = useState<'details' | 'notes' | 'log'>('details');
   const [users, setUsers] = useState<any[]>([]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
 
   useEffect(() => {
@@ -1162,6 +1164,8 @@ function CallsPageContent() {
       if (search) params.search = search;
       if (filterSource) params.source = filterSource;
       if (filterLabel) params.label = filterLabel;
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
 
       // Apply view-based filters
       if (urlView === 'open')         { params.label = 'Open'; }
@@ -1179,7 +1183,7 @@ function CallsPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, sortBy, sortOrder, filterSource, filterLabel, urlView]);
+  }, [page, search, sortBy, sortOrder, filterSource, filterLabel, urlView, startDate, endDate]);
 
   useEffect(() => { fetchCalls(); }, [fetchCalls]);
 
@@ -1235,7 +1239,7 @@ function CallsPageContent() {
       <div style={{ display: 'flex', position: 'relative' }}>
         {/* Filter Panel */}
         {showFilter && (
-          <div className="filter-panel" style={{ left: 240 }}>
+          <div className="filter-panel" style={{ left: sidebarCollapsed ? 64 : 240 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <span style={{ fontWeight: 600, fontSize: 14 }}>Filters</span>
               <button onClick={() => setShowFilter(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={16} /></button>
@@ -1266,12 +1270,37 @@ function CallsPageContent() {
         {/* Content */}
         <div style={{ flex: 1, padding: 24, marginLeft: showFilter ? 280 : 0, transition: 'margin-left 0.2s' }}>
           {/* Search bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative' }}>
               <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
               <input className="search-bar" placeholder="Search calls..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
             </div>
-            <span style={{ fontSize: 13, color: '#6b7280' }}>{total} calls</span>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input 
+                type="date" 
+                value={startDate} 
+                onChange={e => { setStartDate(e.target.value); setPage(1); }} 
+                style={{ padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white', color: '#374151', height: 38 }}
+              />
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>to</span>
+              <input 
+                type="date" 
+                value={endDate} 
+                onChange={e => { setEndDate(e.target.value); setPage(1); }} 
+                style={{ padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white', color: '#374151', height: 38 }}
+              />
+              {(startDate || endDate) && (
+                <button 
+                  onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }} 
+                  style={{ background: '#fee2e2', border: 'none', color: '#b91c1c', padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, height: 38 }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            <span style={{ fontSize: 13, color: '#6b7280', marginLeft: 'auto' }}>{total} calls</span>
             {selectedIds.length > 0 && (
               <span style={{ fontSize: 13, color: '#1a73e8', fontWeight: 500 }}>{selectedIds.length} selected</span>
             )}

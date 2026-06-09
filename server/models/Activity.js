@@ -9,9 +9,13 @@ const activitySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Call'
   },
+  intec: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Intec'
+  },
   type: {
     type: String,
-    enum: ['Creation', 'Label', 'Note', 'Assignment', 'Conversion', 'DateUpdate', 'Update'],
+    enum: ['Creation', 'Label', 'Note', 'Assignment', 'Conversion', 'DateUpdate', 'Update', 'WhatsApp', 'Email'],
     required: true
   },
   content: {

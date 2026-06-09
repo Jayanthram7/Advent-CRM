@@ -4,9 +4,9 @@ import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
   Home, Users, Target, LogOut,
-  ChevronDown, ChevronRight, Circle,
+  ChevronDown, ChevronRight, ChevronLeft, Circle,
   Inbox, Clock, Calendar, CheckCircle2,
-  Database, Upload, FileText, X, Phone
+  Database, Upload, FileText, X, Phone, Building2
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -26,17 +26,28 @@ const CALL_VIEWS = [
   { label: 'Completed',    href: '/calls?view=completed',    icon: CheckCircle2 },
 ];
 
+const INTEC_VIEWS = [
+  { label: 'Open',         href: '/intec?view=open',         icon: Inbox },
+  { label: 'Follow Up',    href: '/intec?view=followup',     icon: Clock },
+  { label: 'Installation', href: '/intec?view=installation', icon: Calendar },
+  { label: 'Date Set',     href: '/intec?view=dateset',      icon: Calendar },
+  { label: 'Completed',    href: '/intec?view=completed',    icon: CheckCircle2 },
+];
+
 export default function Sidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, sidebarCollapsed, toggleSidebar } = useAuth();
 
   const isLeadsActive = pathname === '/leads' || pathname.startsWith('/leads/');
   const [leadsOpen, setLeadsOpen] = useState(isLeadsActive);
 
   const isCallsActive = pathname === '/calls' || pathname.startsWith('/calls/');
   const [callsOpen, setCallsOpen] = useState(isCallsActive);
+
+  const isIntecActive = pathname === '/intec' || pathname.startsWith('/intec/');
+  const [intecOpen, setIntecOpen] = useState(isIntecActive);
 
   const isTssActive = pathname.startsWith('/tss');
   const [tssOpen, setTssOpen] = useState(isTssActive);
@@ -72,6 +83,11 @@ export default function Sidebar() {
   useEffect(() => {
     if (isCallsActive) setCallsOpen(true);
   }, [isCallsActive]);
+
+  // Keep expanded if navigating between Intec sub-views
+  useEffect(() => {
+    if (isIntecActive) setIntecOpen(true);
+  }, [isIntecActive]);
 
   const currentView = searchParams.get('view');
 
@@ -148,12 +164,34 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="sidebar">
+    <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
       {/* Logo */}
-      <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">A</div>
-        <span className="sidebar-logo-text">Advent CRM</span>
-      </div>
+      {sidebarCollapsed ? (
+        <div className="sidebar-logo" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '16px 0' }}>
+          <div className="sidebar-logo-icon">A</div>
+          <button 
+            onClick={toggleSidebar} 
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: '4px' }}
+            title="Expand Sidebar"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      ) : (
+        <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="sidebar-logo-icon">A</div>
+            <span className="sidebar-logo-text">Advent CRM</span>
+          </div>
+          <button 
+            onClick={toggleSidebar} 
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: '4px' }}
+            title="Collapse Sidebar"
+          >
+            <ChevronLeft size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Nav */}
       <nav style={{ flex: 1 }}>
@@ -163,37 +201,39 @@ export default function Sidebar() {
           className={`sidebar-item ${pathname === '/home' ? 'active' : ''}`}
         >
           <Home size={15} />
-          Dashboard
+          <span className="sidebar-item-text">Dashboard</span>
         </Link>
 
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
+        {!sidebarCollapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />}
         <div className="sidebar-section-title">Sales</div>
 
         {/* Leads parent row */}
         <Link
           href="/leads"
           className={`sidebar-item ${isLeadsActive && !currentView ? 'active' : ''}`}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 8 }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', paddingRight: sidebarCollapsed ? 0 : 8 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Target size={15} />
-            Leads
+            <span className="sidebar-item-text">Leads</span>
           </div>
-          <div
-            onClick={(e) => {
-              e.preventDefault();
-              setLeadsOpen(o => !o);
-            }}
-            style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <span style={{ opacity: 0.5, transition: 'transform 0.2s', transform: leadsOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
-              <ChevronDown size={13} />
-            </span>
-          </div>
+          {!sidebarCollapsed && (
+            <div
+              onClick={(e) => {
+                e.preventDefault();
+                setLeadsOpen(o => !o);
+              }}
+              style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <span className="sidebar-arrow" style={{ opacity: 0.5, transition: 'transform 0.2s', transform: leadsOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
+                <ChevronDown size={13} />
+              </span>
+            </div>
+          )}
         </Link>
 
         {/* Sub-items */}
-        {leadsOpen && (
+        {leadsOpen && !sidebarCollapsed && (
           <div style={{ marginLeft: 0 }}>
             {LEAD_VIEWS.map(({ label, href, icon: Icon }) => {
               const active = isSubActive(href, '/leads');
@@ -205,7 +245,7 @@ export default function Sidebar() {
                   style={{ paddingLeft: 38, fontSize: 13 }}
                 >
                   <Icon size={13} style={{ opacity: active ? 1 : 0.6 }} />
-                  {label}
+                  <span className="sidebar-item-text">{label}</span>
                 </Link>
               );
             })}
@@ -216,27 +256,29 @@ export default function Sidebar() {
         <Link
           href="/calls"
           className={`sidebar-item ${isCallsActive && !currentView ? 'active' : ''}`}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 8 }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', paddingRight: sidebarCollapsed ? 0 : 8 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Phone size={15} />
-            Calls
+            <span className="sidebar-item-text">Calls</span>
           </div>
-          <div
-            onClick={(e) => {
-              e.preventDefault();
-              setCallsOpen(o => !o);
-            }}
-            style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <span style={{ opacity: 0.5, transition: 'transform 0.2s', transform: callsOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
-              <ChevronDown size={13} />
-            </span>
-          </div>
+          {!sidebarCollapsed && (
+            <div
+              onClick={(e) => {
+                e.preventDefault();
+                setCallsOpen(o => !o);
+              }}
+              style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <span className="sidebar-arrow" style={{ opacity: 0.5, transition: 'transform 0.2s', transform: callsOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
+                <ChevronDown size={13} />
+              </span>
+            </div>
+          )}
         </Link>
 
         {/* Sub-items */}
-        {callsOpen && (
+        {callsOpen && !sidebarCollapsed && (
           <div style={{ marginLeft: 0 }}>
             {CALL_VIEWS.map(({ label, href, icon: Icon }) => {
               const active = isSubActive(href, '/calls');
@@ -248,7 +290,52 @@ export default function Sidebar() {
                   style={{ paddingLeft: 38, fontSize: 13 }}
                 >
                   <Icon size={13} style={{ opacity: active ? 1 : 0.6 }} />
-                  {label}
+                  <span className="sidebar-item-text">{label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Intec parent row */}
+        <Link
+          href="/intec"
+          className={`sidebar-item ${isIntecActive && !currentView ? 'active' : ''}`}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', paddingRight: sidebarCollapsed ? 0 : 8 }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Building2 size={15} />
+            <span className="sidebar-item-text">Intec</span>
+          </div>
+          {!sidebarCollapsed && (
+            <div
+              onClick={(e) => {
+                e.preventDefault();
+                setIntecOpen(o => !o);
+              }}
+              style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <span className="sidebar-arrow" style={{ opacity: 0.5, transition: 'transform 0.2s', transform: intecOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
+                <ChevronDown size={13} />
+              </span>
+            </div>
+          )}
+        </Link>
+
+        {/* Sub-items */}
+        {intecOpen && !sidebarCollapsed && (
+          <div style={{ marginLeft: 0 }}>
+            {INTEC_VIEWS.map(({ label, href, icon: Icon }) => {
+              const active = isSubActive(href, '/intec');
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`sidebar-item ${active ? 'active' : ''}`}
+                  style={{ paddingLeft: 38, fontSize: 13 }}
+                >
+                  <Icon size={13} style={{ opacity: active ? 1 : 0.6 }} />
+                  <span className="sidebar-item-text">{label}</span>
                 </Link>
               );
             })}
@@ -256,27 +343,29 @@ export default function Sidebar() {
         )}
 
         {/* TSS Section */}
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
+        {!sidebarCollapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />}
         <div className="sidebar-section-title">Operations</div>
 
         <Link
           href="#"
           onClick={handleTssClick}
           className={`sidebar-item ${isTssActive ? 'active' : ''}`}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 8 }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', paddingRight: sidebarCollapsed ? 0 : 8 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Database size={15} />
-            TSS
+            <span className="sidebar-item-text">TSS</span>
           </div>
-          <div style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ opacity: 0.5, transition: 'transform 0.2s', transform: tssOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
-              <ChevronDown size={13} />
-            </span>
-          </div>
+          {!sidebarCollapsed && (
+            <div style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span className="sidebar-arrow" style={{ opacity: 0.5, transition: 'transform 0.2s', transform: tssOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
+                <ChevronDown size={13} />
+              </span>
+            </div>
+          )}
         </Link>
 
-        {tssOpen && (
+        {tssOpen && !sidebarCollapsed && (
           <div style={{ marginLeft: 0 }}>
             <div
               onClick={() => setIsImportModalOpen(true)}
@@ -284,7 +373,7 @@ export default function Sidebar() {
               style={{ paddingLeft: 38, fontSize: 13, cursor: 'pointer', color: '#38bdf8' }}
             >
               <Upload size={13} style={{ opacity: 1 }} />
-              Import Data
+              <span className="sidebar-item-text">Import Data</span>
             </div>
 
             {tssDatasets.map((ds) => {
@@ -298,7 +387,7 @@ export default function Sidebar() {
                   style={{ paddingLeft: 38, fontSize: 13 }}
                 >
                   <FileText size={13} style={{ opacity: active ? 1 : 0.6 }} />
-                  {ds.name}
+                  <span className="sidebar-item-text">{ds.name}</span>
                 </Link>
               );
             })}
@@ -308,29 +397,29 @@ export default function Sidebar() {
         {/* Admin */}
         {isAdmin && (
           <>
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
+            {!sidebarCollapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />}
             <div className="sidebar-section-title">Admin</div>
             <div
               onClick={() => {
                 if (pathname !== '/users') setAdminAuthStep(1);
               }}
               className={`sidebar-item ${pathname === '/users' ? 'active' : ''}`}
-              style={{ cursor: 'pointer' }}
+              style={{ cursor: 'pointer', display: 'flex', justifyContent: sidebarCollapsed ? 'center' : 'flex-start' }}
             >
               <Users size={15} />
-              Users
+              <span className="sidebar-item-text">Users</span>
             </div>
           </>
         )}
       </nav>
 
       {/* User info */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '12px 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+      <div className="sidebar-user-container" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '12px 16px', display: 'flex', flexDirection: 'column', alignItems: sidebarCollapsed ? 'center' : 'stretch' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, width: '100%', justifyContent: sidebarCollapsed ? 'center' : 'flex-start' }}>
           <div className="avatar" style={{ width: 30, height: 30, fontSize: 11 }}>
             {user?.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="sidebar-user-text" style={{ flex: 1, minWidth: 0 }}>
             <div style={{ color: '#e2e8f0', fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user?.name}
             </div>
@@ -339,17 +428,19 @@ export default function Sidebar() {
         </div>
         <button
           onClick={logout}
+          className="sidebar-signout-btn"
           style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: 8,
             padding: '8px 10px', background: 'rgba(255,255,255,0.05)',
             border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
             color: '#94a3b8', fontSize: 12.5, cursor: 'pointer', transition: 'all 0.15s',
+            justifyContent: sidebarCollapsed ? 'center' : 'flex-start'
           }}
           onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
           onMouseOut={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
         >
           <LogOut size={14} />
-          Sign out
+          <span className="sidebar-signout-text">Sign out</span>
         </button>
       </div>
       

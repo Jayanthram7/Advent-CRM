@@ -357,13 +357,17 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
   const [selectedRecord, setSelectedRecord] = useState<TssRecord | null>(null);
   const [drawerTab, setDrawerTab] = useState<'details' | 'notes'>('details');
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const fetchRecords = async (p = page, q = search, v = viewFilter) => {
     setLoading(true);
     try {
-      const res = await api.get(`/tss/datasets/${id}/records`, {
-        params: { page: p, limit: 50, search: q, view: v }
-      });
+      const params: Record<string, any> = { page: p, limit: 50, search: q, view: v };
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      
+      const res = await api.get(`/tss/datasets/${id}/records`, { params });
       setRecords(res.data.records);
       setTotalPages(res.data.pages);
       setTotalRecords(res.data.total);
@@ -379,7 +383,7 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  useEffect(() => { fetchRecords(page, search, viewFilter); }, [id, page, viewFilter]);
+  useEffect(() => { fetchRecords(page, search, viewFilter); }, [id, page, viewFilter, startDate, endDate]);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
@@ -417,13 +421,37 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
               ))}
             </div>
 
-            <div style={{ position: 'relative' }}>
-              <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-              <input
-                type="text" placeholder="Search..." value={search} onChange={handleSearch}
-                style={{ padding: '9px 12px 9px 34px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, width: 220, outline: 'none', background: 'white' }}
-              />
-            </div>
+             <div style={{ position: 'relative' }}>
+               <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+               <input
+                 type="text" placeholder="Search..." value={search} onChange={handleSearch}
+                 style={{ padding: '9px 12px 9px 34px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, width: 220, outline: 'none', background: 'white' }}
+               />
+             </div>
+
+             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+               <input 
+                 type="date" 
+                 value={startDate} 
+                 onChange={e => { setStartDate(e.target.value); setPage(1); }} 
+                 style={{ padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white', color: '#374151', height: 38 }}
+               />
+               <span style={{ fontSize: 12, color: '#9ca3af' }}>to</span>
+               <input 
+                 type="date" 
+                 value={endDate} 
+                 onChange={e => { setEndDate(e.target.value); setPage(1); }} 
+                 style={{ padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white', color: '#374151', height: 38 }}
+               />
+               {(startDate || endDate) && (
+                 <button 
+                   onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }} 
+                   style={{ background: '#fee2e2', border: 'none', color: '#b91c1c', padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, height: 38 }}
+                 >
+                   Clear
+                 </button>
+               )}
+             </div>
 
             <button
               onClick={() => {

@@ -10,13 +10,12 @@ import {
   ChevronUp, ChevronDown, MoreVertical, Tag, Calendar,
   CheckCircle, FileText, Trash2, X, Phone, Mail,
   MapPin, Building2, Hash, Globe, User, Clock, StickyNote, MessageCircle,
-  AlertCircle
+  AlertCircle, Upload, Download
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 
 const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review'];
-const SOURCE_OPTIONS = ['Website', 'Cold Call', 'Referral', 'Social Media', 'Email Campaign', 'Walk-in', 'Other'];
 
 const LABEL_CLASSES: Record<string, string> = {
   'Open': 'badge badge-open',
@@ -24,25 +23,26 @@ const LABEL_CLASSES: Record<string, string> = {
   'Interested': 'badge badge-interested',
   'Not Interested': 'badge badge-not-interested',
   'Follow Up': 'badge badge-follow-up',
-  'Hot Lead': 'badge badge-hot-lead',
-  'Cold Lead': 'badge badge-cold-lead',
+  'Hot Lead': 'badge badge-hot-call',
+  'Cold Lead': 'badge badge-cold-call',
   'Review': 'badge badge-review',
 };
 
-interface Lead {
+interface IntecRecord {
   _id: string;
-  firstName: string;
-  lastName: string;
+  hallNumber: string;
+  stallNumber: string;
+  companyName: string;
+  contactPerson: string;
+  position: string;
   email: string;
-  phone: string;
-  secondaryPhone?: string;
-  company: string;
-  licenseNumber: string;
-  leadSource: string;
-  address?: string;
-  city?: string;
-  country?: string;
-  reason?: string;
+  mobile1: string;
+  mobile2: string;
+  address: string;
+  country: string;
+  state: string;
+  pincode: string;
+  website?: string;
   labels: string[];
   status?: string;
   isConverted: boolean;
@@ -65,8 +65,6 @@ interface Lead {
   createdAt: string;
 }
 
-
-
 interface Note {
   _id: string;
   content: string;
@@ -82,13 +80,17 @@ interface Activity {
   createdAt: string;
 }
 
-
-function getInitials(first: string, last: string) {
-  return `${first?.[0] || ''}${last?.[0] || ''}`.toUpperCase();
+function getInitials(name: string) {
+  if (!name) return 'IN';
+  const parts = name.trim().split(' ');
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
 }
 
-// ─── Lead Detail Drawer ───────────────────────────────────────────────────────
-function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead: Lead; defaultTab?: 'details' | 'notes' | 'log'; onClose: () => void; onRefresh: (updatedLead?: Lead) => void }) {
+// ─── Intec Detail Drawer ──────────────────────────────────────────────────────
+function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { record: IntecRecord; defaultTab?: 'details' | 'notes' | 'log'; onClose: () => void; onRefresh: (updatedRecord?: IntecRecord) => void }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [newNote, setNewNote] = useState('');
@@ -98,56 +100,53 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
 
   const [isUpdatingFollowUp, setIsUpdatingFollowUp] = useState(false);
   const [newFollowUpDate, setNewFollowUpDate] = useState(
-    lead.followUpDate ? new Date(lead.followUpDate).toISOString().split('T')[0] : ''
+    record.followUpDate ? new Date(record.followUpDate).toISOString().split('T')[0] : ''
   );
   const [followUpNote, setFollowUpNote] = useState('');
   const [updatingFollowUpLoading, setUpdatingFollowUpLoading] = useState(false);
 
   const [isUpdatingCallback, setIsUpdatingCallback] = useState(false);
   const [newCallbackDate, setNewCallbackDate] = useState(
-    lead.callbackDate ? new Date(lead.callbackDate).toISOString().split('T')[0] : ''
+    record.callbackDate ? new Date(record.callbackDate).toISOString().split('T')[0] : ''
   );
   const [callbackNote, setCallbackNote] = useState('');
   const [updatingCallbackLoading, setUpdatingCallbackLoading] = useState(false);
 
   useEffect(() => {
-    setNewCallbackDate(lead.callbackDate ? new Date(lead.callbackDate).toISOString().split('T')[0] : '');
+    setNewCallbackDate(record.callbackDate ? new Date(record.callbackDate).toISOString().split('T')[0] : '');
     setCallbackNote('');
     setIsUpdatingCallback(false);
-    setNewFollowUpDate(lead.followUpDate ? new Date(lead.followUpDate).toISOString().split('T')[0] : '');
+    setNewFollowUpDate(record.followUpDate ? new Date(record.followUpDate).toISOString().split('T')[0] : '');
     setFollowUpNote('');
     setIsUpdatingFollowUp(false);
-  }, [lead]);
-
+  }, [record]);
 
   const fetchNotes = useCallback(() => {
-    api.get(`/leads/${lead._id}/notes`).then(r => setNotes(r.data)).catch(() => {});
-  }, [lead._id]);
+    api.get(`/intec/${record._id}/notes`).then(r => setNotes(r.data)).catch(() => {});
+  }, [record._id]);
 
   const fetchActivities = useCallback(() => {
     setActivitiesLoading(true);
-    api.get(`/leads/${lead._id}/activities`)
+    api.get(`/intec/${record._id}/activities`)
       .then(r => setActivities(r.data))
       .catch(() => {})
       .finally(() => setActivitiesLoading(false));
-  }, [lead._id]);
+  }, [record._id]);
 
   useEffect(() => {
     fetchNotes();
     fetchActivities();
   }, [fetchNotes, fetchActivities]);
 
-
   const addNote = async () => {
     if (!newNote.trim()) return;
     setNotesLoading(true);
     try {
-      await api.post(`/leads/${lead._id}/notes`, { content: newNote });
+      await api.post(`/intec/${record._id}/notes`, { content: newNote });
       fetchNotes();
       fetchActivities();
       setNewNote('');
       toast.success('Note added');
-
     } catch {
       toast.error('Failed to add note');
     } finally {
@@ -156,18 +155,16 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
   };
 
   const handleWhatsApp = async () => {
-    if (!lead.phone) {
-      toast.error('No phone number available');
+    const mobile = record.mobile1 || record.mobile2;
+    if (!mobile) {
+      toast.error('No mobile number available');
       return;
     }
-    
-    // Clean phone number (remove +, spaces, etc.)
-    const cleanPhone = lead.phone.replace(/\D/g, '');
-    const message = encodeURIComponent(`Hi ${lead.firstName}, this is from Advent Systems regarding your inquiry...`);
+    const cleanPhone = mobile.replace(/\D/g, '');
+    const message = encodeURIComponent(`Hi ${record.contactPerson}, this is from Advent Systems regarding our discussion at Intec...`);
     const waUrl = `https://wa.me/${cleanPhone}?text=${message}`;
     
-    // Log activity in background
-    api.post(`/leads/${lead._id}/whatsapp-log`).then(() => {
+    api.post(`/intec/${record._id}/whatsapp-log`).then(() => {
       fetchActivities();
       onRefresh();
     }).catch(() => {});
@@ -176,19 +173,15 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
   };
 
   const handleEmail = async () => {
-    if (!lead.email) {
+    if (!record.email) {
       toast.error('No email address available');
       return;
     }
+    const subject = encodeURIComponent('Inquiry from Advent Systems - Intec');
+    const body = encodeURIComponent(`Hi ${record.contactPerson},\n\nIt was nice meeting you at Intec. This is regarding our discussion...`);
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${record.email}&su=${subject}&body=${body}`;
     
-    const subject = encodeURIComponent('Inquiry from Advent Systems');
-    const body = encodeURIComponent(`Hi ${lead.firstName},\n\nThis is regarding your inquiry with Advent Systems...`);
-    
-    // Direct Gmail compose link
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${lead.email}&su=${subject}&body=${body}`;
-    
-    // Log activity in background
-    api.post(`/leads/${lead._id}/email-log`).then(() => {
+    api.post(`/intec/${record._id}/email-log`).then(() => {
       fetchActivities();
       onRefresh();
     }).catch(() => {});
@@ -210,45 +203,43 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
 
   return (
     <>
-      {/* Overlay */}
       <div
         onClick={onClose}
         style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 150, backdropFilter: 'blur(2px)', animation: 'fadeIn 0.2s ease' }}
       />
-      {/* Drawer */}
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: 480,
         background: 'white', boxShadow: '-8px 0 40px rgba(0,0,0,0.15)',
         zIndex: 160, display: 'flex', flexDirection: 'column',
         animation: 'slideInRight 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
       }}>
-        {/* Drawer Header */}
+        {/* Header */}
         <div style={{ padding: '20px 24px 0', borderBottom: '1px solid #f0f2f7' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{
                 width: 48, height: 48, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #1a73e8, #6c63ff)',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 17, fontWeight: 700, color: 'white', flexShrink: 0
               }}>
-                {getInitials(lead.firstName, lead.lastName)}
+                {getInitials(record.contactPerson)}
               </div>
               <div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1f36' }}>
-                  {lead.firstName} {lead.lastName}
+                  {record.contactPerson || 'Unknown Contact'}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                  {lead.isConverted && <span className="badge badge-converted" style={{ fontSize: 11 }}>Converted</span>}
-                  {lead.status && !lead.isConverted && <span className="badge badge-open" style={{ fontSize: 11 }}>{lead.status}</span>}
-                  {(lead.labels || []).map(l => (
+                  {record.isConverted && <span className="badge badge-converted" style={{ fontSize: 11 }}>Converted</span>}
+                  {record.status && !record.isConverted && <span className="badge badge-open" style={{ fontSize: 11 }}>{record.status}</span>}
+                  {(record.labels || []).map(l => (
                     <span key={l} className={LABEL_CLASSES[l] || 'badge'} style={{ fontSize: 11 }}>{l}</span>
                   ))}
                 </div>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {lead.phone && (
+              {(record.mobile1 || record.mobile2) && (
                 <button 
                   onClick={handleWhatsApp}
                   title="Contact via WhatsApp"
@@ -274,7 +265,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                   WhatsApp
                 </button>
               )}
-              {lead.email && (
+              {record.email && (
                 <button 
                   onClick={handleEmail}
                   title="Contact via Email"
@@ -319,16 +310,14 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
               </button>
             ))}
           </div>
-
         </div>
 
-        {/* Drawer Body */}
+        {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 24px' }}>
-
           {activeTab === 'details' && (
             <div style={{ paddingTop: 8 }}>
-              {/* Callback date callout */}
-              {lead.callbackDate && (
+              {/* Callback Alert */}
+              {record.callbackDate && (
                 <div style={{
                   background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '1px solid #bfdbfe',
                   borderRadius: 10, padding: '16px', margin: '16px 0',
@@ -340,7 +329,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                       <div>
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Callback Date</div>
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1f36', marginTop: 1 }}>
-                          {format(new Date(lead.callbackDate), 'EEEE, MMMM d, yyyy')}
+                          {format(new Date(record.callbackDate), 'EEEE, MMMM d, yyyy')}
                         </div>
                       </div>
                     </div>
@@ -351,8 +340,6 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                         borderRadius: 6, padding: '4px 10px', fontSize: 12,
                         fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.15s'
                       }}
-                      onMouseOver={e => e.currentTarget.style.opacity = '0.9'}
-                      onMouseOut={e => e.currentTarget.style.opacity = '1'}
                     >
                       {isUpdatingCallback ? 'Cancel' : 'Update'}
                     </button>
@@ -361,13 +348,8 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                   {isUpdatingCallback && (
                     <div style={{ 
                       background: 'rgba(255, 255, 255, 0.6)', 
-                      borderRadius: 8, 
-                      padding: 12, 
-                      border: '1px dashed #bfdbfe',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 10,
-                      marginTop: 4
+                      borderRadius: 8, padding: 12, border: '1px dashed #bfdbfe',
+                      display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4
                     }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <label style={{ fontSize: 11, fontWeight: 600, color: '#1d4ed8' }}>New Callback Date</label>
@@ -375,33 +357,17 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                           type="date"
                           value={newCallbackDate}
                           onChange={e => setNewCallbackDate(e.target.value)}
-                          style={{
-                            border: '1px solid #d1d5db',
-                            borderRadius: 6,
-                            padding: '6px 10px',
-                            fontSize: 13,
-                            outline: 'none',
-                            background: 'white'
-                          }}
+                          style={{ border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', fontSize: 13, outline: 'none', background: 'white' }}
                         />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <label style={{ fontSize: 11, fontWeight: 600, color: '#1d4ed8' }}>Customer Notes</label>
                         <textarea
-                          placeholder="What did the customer say?"
+                          placeholder="Note down callback requirements..."
                           value={callbackNote}
                           onChange={e => setCallbackNote(e.target.value)}
                           rows={2}
-                          style={{
-                            border: '1px solid #d1d5db',
-                            borderRadius: 6,
-                            padding: '6px 10px',
-                            fontSize: 13,
-                            resize: 'none',
-                            outline: 'none',
-                            fontFamily: 'inherit',
-                            background: 'white'
-                          }}
+                          style={{ border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', fontSize: 13, resize: 'none', outline: 'none', fontFamily: 'inherit', background: 'white' }}
                         />
                       </div>
                       <button
@@ -412,7 +378,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                           }
                           setUpdatingCallbackLoading(true);
                           try {
-                            const res = await api.post(`/leads/${lead._id}/date`, {
+                            const res = await api.post(`/intec/${record._id}/date`, {
                               callbackDate: newCallbackDate,
                               note: callbackNote
                             });
@@ -428,18 +394,9 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                         }}
                         disabled={updatingCallbackLoading}
                         style={{
-                          background: '#1d4ed8',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 6,
-                          padding: '8px 12px',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 6
+                          background: '#1d4ed8', color: 'white', border: 'none', borderRadius: 6,
+                          padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
                         }}
                       >
                         {updatingCallbackLoading ? <div className="spinner" style={{ width: 14, height: 14 }} /> : 'Save Callback Date'}
@@ -447,19 +404,17 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                     </div>
                   )}
 
-                  {lead.followUpHistory && lead.followUpHistory.length > 0 && (
+                  {record.followUpHistory && record.followUpHistory.length > 0 && (
                     <div style={{ marginTop: 6, borderTop: '1px solid rgba(29, 78, 216, 0.15)', paddingTop: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>History</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
-                        {lead.followUpHistory.map((history, idx) => (
+                        {record.followUpHistory.map((history, idx) => (
                           <div key={idx} style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(29, 78, 216, 0.1)', borderRadius: 6, padding: 8 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, fontSize: 11, fontWeight: 500, color: '#1d4ed8' }}>
                               <span>{format(new Date(history.date), 'MMM d, yyyy')}</span>
                               <span>{history.updatedBy}</span>
                             </div>
-                            {history.note && (
-                              <p style={{ margin: 0, fontSize: 12, color: '#1a1f36', lineHeight: 1.4 }}>{history.note}</p>
-                            )}
+                            {history.note && <p style={{ margin: 0, fontSize: 12, color: '#1a1f36', lineHeight: 1.4 }}>{history.note}</p>}
                           </div>
                         ))}
                       </div>
@@ -467,7 +422,9 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                   )}
                 </div>
               )}
-              {lead.followUpDate && (
+
+              {/* Followup Alert */}
+              {record.followUpDate && (
                 <div style={{
                   background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', border: '1px solid #fde68a',
                   borderRadius: 10, padding: '16px', marginBottom: 16,
@@ -479,7 +436,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                       <div>
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Follow-up Date</div>
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1f36', marginTop: 1 }}>
-                          {format(new Date(lead.followUpDate), 'EEEE, MMMM d, yyyy')}
+                          {format(new Date(record.followUpDate), 'EEEE, MMMM d, yyyy')}
                         </div>
                       </div>
                     </div>
@@ -490,8 +447,6 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                         borderRadius: 6, padding: '4px 10px', fontSize: 12,
                         fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.15s'
                       }}
-                      onMouseOver={e => e.currentTarget.style.opacity = '0.9'}
-                      onMouseOut={e => e.currentTarget.style.opacity = '1'}
                     >
                       {isUpdatingFollowUp ? 'Cancel' : 'Update'}
                     </button>
@@ -500,13 +455,8 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                   {isUpdatingFollowUp && (
                     <div style={{ 
                       background: 'rgba(255, 255, 255, 0.6)', 
-                      borderRadius: 8, 
-                      padding: 12, 
-                      border: '1px dashed #fde68a',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 10,
-                      marginTop: 4
+                      borderRadius: 8, padding: 12, border: '1px dashed #fde68a',
+                      display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4
                     }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <label style={{ fontSize: 11, fontWeight: 600, color: '#b45309' }}>New Follow-up Date</label>
@@ -514,33 +464,17 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                           type="date"
                           value={newFollowUpDate}
                           onChange={e => setNewFollowUpDate(e.target.value)}
-                          style={{
-                            border: '1px solid #d1d5db',
-                            borderRadius: 6,
-                            padding: '6px 10px',
-                            fontSize: 13,
-                            outline: 'none',
-                            background: 'white'
-                          }}
+                          style={{ border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', fontSize: 13, outline: 'none', background: 'white' }}
                         />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <label style={{ fontSize: 11, fontWeight: 600, color: '#b45309' }}>Customer Notes</label>
                         <textarea
-                          placeholder="What did the customer say?"
+                          placeholder="What did the contact say?"
                           value={followUpNote}
                           onChange={e => setFollowUpNote(e.target.value)}
                           rows={2}
-                          style={{
-                            border: '1px solid #d1d5db',
-                            borderRadius: 6,
-                            padding: '6px 10px',
-                            fontSize: 13,
-                            resize: 'none',
-                            outline: 'none',
-                            fontFamily: 'inherit',
-                            background: 'white'
-                          }}
+                          style={{ border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', fontSize: 13, resize: 'none', outline: 'none', fontFamily: 'inherit', background: 'white' }}
                         />
                       </div>
                       <button
@@ -551,7 +485,7 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                           }
                           setUpdatingFollowUpLoading(true);
                           try {
-                            const res = await api.post(`/leads/${lead._id}/date`, {
+                            const res = await api.post(`/intec/${record._id}/date`, {
                               followUpDate: newFollowUpDate,
                               note: followUpNote
                             });
@@ -567,18 +501,9 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                         }}
                         disabled={updatingFollowUpLoading}
                         style={{
-                          background: '#b45309',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 6,
-                          padding: '8px 12px',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 6
+                          background: '#b45309', color: 'white', border: 'none', borderRadius: 6,
+                          padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
                         }}
                       >
                         {updatingFollowUpLoading ? <div className="spinner" style={{ width: 14, height: 14 }} /> : 'Save Follow-up'}
@@ -586,11 +511,11 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                     </div>
                   )}
 
-                  {lead.followUpHistory && lead.followUpHistory.length > 0 && (
+                  {record.followUpHistory && record.followUpHistory.length > 0 && (
                     <div style={{ marginTop: 6, borderTop: '1px solid rgba(180, 83, 9, 0.15)', paddingTop: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>History</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
-                        {lead.followUpHistory.map((history, idx) => (
+                        {record.followUpHistory.map((history, idx) => (
                           <div key={idx} style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(180, 83, 9, 0.1)', borderRadius: 6, padding: 8 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, fontSize: 11, fontWeight: 500, color: '#b45309' }}>
                               <span>{format(new Date(history.date), 'MMM d, yyyy')}</span>
@@ -606,7 +531,8 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                   )}
                 </div>
               )}
-              {lead.installationDate && (
+
+              {record.installationDate && (
                 <div style={{
                   background: 'linear-gradient(135deg, #f0fdf4, #bbf7d0)', border: '1px solid #86efac',
                   borderRadius: 10, padding: '12px 16px', marginBottom: 16,
@@ -616,34 +542,38 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 600, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Installation Date</div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1f36', marginTop: 1 }}>
-                      {format(new Date(lead.installationDate), 'EEEE, MMMM d, yyyy')}
+                      {format(new Date(record.installationDate), 'EEEE, MMMM d, yyyy')}
                     </div>
                   </div>
                 </div>
               )}
 
-              <div style={{ paddingTop: lead.callbackDate || lead.followUpDate || lead.installationDate ? 0 : 16 }}>
-                <InfoRow icon={<Mail size={15} />} label="Email" value={lead.email} />
-                <InfoRow icon={<FileText size={15} />} label="Reason" value={lead.reason} />
-                <InfoRow icon={<Phone size={15} />} label="Phone" value={lead.phone} />
-                <InfoRow icon={<Phone size={15} />} label="Secondary Phone" value={lead.secondaryPhone} />
-                <InfoRow icon={<Building2 size={15} />} label="Company" value={lead.company} />
-                <InfoRow icon={<Hash size={15} />} label="License Number" value={lead.licenseNumber} />
-                <InfoRow icon={<Globe size={15} />} label="Lead Source" value={lead.leadSource} />
-                <InfoRow icon={<MapPin size={15} />} label="Address" value={lead.address} />
-                <InfoRow icon={<MapPin size={15} />} label="City" value={lead.city} />
-                <InfoRow icon={<MapPin size={15} />} label="Country" value={lead.country} />
-                <InfoRow icon={<User size={15} />} label="Status" value={lead.status} />
+              {/* Data Grid */}
+              <div style={{ paddingTop: record.callbackDate || record.followUpDate || record.installationDate ? 0 : 16 }}>
+                <InfoRow icon={<Hash size={15} />} label="Hall Number" value={record.hallNumber} />
+                <InfoRow icon={<Hash size={15} />} label="Stall Number" value={record.stallNumber} />
+                <InfoRow icon={<Building2 size={15} />} label="Company Name" value={record.companyName} />
+                <InfoRow icon={<User size={15} />} label="Contact Person" value={record.contactPerson} />
+                <InfoRow icon={<Globe size={15} />} label="Position" value={record.position} />
+                <InfoRow icon={<Mail size={15} />} label="Email" value={record.email} />
+                <InfoRow icon={<Phone size={15} />} label="Mobile 1" value={record.mobile1} />
+                <InfoRow icon={<Phone size={15} />} label="Mobile 2" value={record.mobile2} />
+                <InfoRow icon={<MapPin size={15} />} label="Address" value={record.address} />
+                <InfoRow icon={<MapPin size={15} />} label="Country" value={record.country} />
+                <InfoRow icon={<MapPin size={15} />} label="State" value={record.state} />
+                <InfoRow icon={<MapPin size={15} />} label="Pincode" value={record.pincode} />
+                <InfoRow icon={<Globe size={15} />} label="Website" value={record.website} />
+                <InfoRow icon={<User size={15} />} label="Status" value={record.status} />
                 <InfoRow
                   icon={<Clock size={15} />}
                   label="Created"
-                  value={format(new Date(lead.createdAt), 'MMMM d, yyyy • h:mm a')}
+                  value={format(new Date(record.createdAt), 'MMMM d, yyyy • h:mm a')}
                 />
-                {lead.convertedAt && (
+                {record.convertedAt && (
                   <InfoRow
                     icon={<CheckCircle size={15} />}
                     label="Converted On"
-                    value={format(new Date(lead.convertedAt), 'MMMM d, yyyy • h:mm a')}
+                    value={format(new Date(record.convertedAt), 'MMMM d, yyyy • h:mm a')}
                   />
                 )}
               </div>
@@ -657,15 +587,13 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                 <textarea
                   value={newNote}
                   onChange={e => setNewNote(e.target.value)}
-                  placeholder="Write a note about this lead..."
+                  placeholder="Write a note about this contact..."
                   rows={3}
                   style={{
                     width: '100%', border: '1px solid #e5e7eb', borderRadius: 8,
                     padding: '10px 12px', fontSize: 13.5, resize: 'none', outline: 'none',
                     fontFamily: 'inherit', transition: 'border-color 0.15s'
                   }}
-                  onFocus={e => e.target.style.borderColor = '#1a73e8'}
-                  onBlur={e => e.target.style.borderColor = '#e5e7eb'}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNote(); } }}
                 />
                 <button
@@ -715,10 +643,9 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0, position: 'relative' }}>
-                  {/* Timeline vertical line */}
                   <div style={{ position: 'absolute', left: 7, top: 10, bottom: 10, width: 2, background: '#f0f2f7', zIndex: 0 }} />
                   
-                  {activities.map((act, i) => (
+                  {activities.map((act) => (
                     <div key={act._id} style={{ display: 'flex', gap: 16, marginBottom: 24, position: 'relative', zIndex: 1 }}>
                       <div style={{ 
                         width: 16, height: 16, borderRadius: '50%', 
@@ -747,30 +674,29 @@ function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }: { lead
   );
 }
 
-// ─── Create Lead Modal ───────────────────────────────────────────────────────
-function CreateLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+// ─── Create Intec Modal ──────────────────────────────────────────────────────
+function CreateIntecModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState({
-    firstName: '', lastName: '', email: '', phone: '',
-    secondaryPhone: '', company: '', licenseNumber: '',
-    leadSource: 'Other', address: '', reason: '', labels: ['Open']
+    hallNumber: '', stallNumber: '', companyName: '', contactPerson: '',
+    position: '', email: '', mobile1: '', mobile2: '',
+    address: '', country: '', state: '', pincode: '', website: '', labels: ['Open']
   });
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.firstName || !form.lastName) {
-      toast.error('First and last name are required');
+    if (!form.companyName || !form.contactPerson) {
+      toast.error('Company Name and Contact Person are required');
       return;
     }
     setLoading(true);
     try {
-      await api.post('/leads', form);
-      toast.success('Lead created successfully!');
+      await api.post('/intec', form);
+      toast.success('Intec record created successfully!');
       onCreated();
       onClose();
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      toast.error(error?.response?.data?.message || 'Failed to create lead');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to create record');
     } finally {
       setLoading(false);
     }
@@ -782,67 +708,70 @@ function CreateLeadModal({ onClose, onCreated }: { onClose: () => void; onCreate
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ maxWidth: 680 }}>
         <div className="modal-header">
-          <h2 className="modal-title">Create New Lead</h2>
+          <h2 className="modal-title">Create New Intec Record</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div className="form-group">
-                <label className="form-label">First Name *</label>
-                <input className="form-input" value={form.firstName} onChange={e => set('firstName', e.target.value)} placeholder="John" required />
+                <label className="form-label">Hall Number</label>
+                <input className="form-input" value={form.hallNumber} onChange={e => set('hallNumber', e.target.value)} placeholder="Hall 1" />
               </div>
               <div className="form-group">
-                <label className="form-label">Last Name *</label>
-                <input className="form-input" value={form.lastName} onChange={e => set('lastName', e.target.value)} placeholder="Doe" required />
+                <label className="form-label">Stall Number</label>
+                <input className="form-input" value={form.stallNumber} onChange={e => set('stallNumber', e.target.value)} placeholder="105" />
               </div>
               <div className="form-group">
-                <label className="form-label">Phone Number</label>
-                <input className="form-input" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+1 555 000 0000" />
+                <label className="form-label">Company Name *</label>
+                <input className="form-input" value={form.companyName} onChange={e => set('companyName', e.target.value)} placeholder="Acme Corp" required />
               </div>
               <div className="form-group">
-                <label className="form-label">Secondary Phone</label>
-                <input className="form-input" value={form.secondaryPhone} onChange={e => set('secondaryPhone', e.target.value)} placeholder="+1 555 000 0001" />
+                <label className="form-label">Contact Person *</label>
+                <input className="form-input" value={form.contactPerson} onChange={e => set('contactPerson', e.target.value)} placeholder="John Doe" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Position</label>
+                <input className="form-input" value={form.position} onChange={e => set('position', e.target.value)} placeholder="Manager" />
               </div>
               <div className="form-group">
                 <label className="form-label">Email</label>
                 <input className="form-input" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="john@example.com" />
               </div>
               <div className="form-group">
-                <label className="form-label">Company</label>
-                <input className="form-input" value={form.company} onChange={e => set('company', e.target.value)} placeholder="Acme Inc." />
+                <label className="form-label">Mobile 1</label>
+                <input className="form-input" value={form.mobile1} onChange={e => set('mobile1', e.target.value)} placeholder="+91 99999 99999" />
               </div>
               <div className="form-group">
-                <label className="form-label">License Number</label>
-                <input className="form-input" value={form.licenseNumber} onChange={e => set('licenseNumber', e.target.value)} placeholder="LIC-12345" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Lead Source</label>
-                <select className="form-select" value={form.leadSource} onChange={e => set('leadSource', e.target.value)}>
-                  {SOURCE_OPTIONS.map(s => <option key={s}>{s}</option>)}
-                </select>
+                <label className="form-label">Mobile 2</label>
+                <input className="form-input" value={form.mobile2} onChange={e => set('mobile2', e.target.value)} placeholder="+91 88888 88888" />
               </div>
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                 <label className="form-label">Address</label>
-                <input className="form-input" value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, Country" />
+                <input className="form-input" value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main Rd" />
               </div>
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label className="form-label">Reason</label>
-                <textarea
-                  className="form-input"
-                  value={form.reason}
-                  onChange={e => set('reason', e.target.value)}
-                  placeholder="Reason for enquiry..."
-                  rows={2}
-                  style={{ resize: 'none' }}
-                />
+              <div className="form-group">
+                <label className="form-label">Country</label>
+                <input className="form-input" value={form.country} onChange={e => set('country', e.target.value)} placeholder="India" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">State</label>
+                <input className="form-input" value={form.state} onChange={e => set('state', e.target.value)} placeholder="Tamil Nadu" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Pincode</label>
+                <input className="form-input" value={form.pincode} onChange={e => set('pincode', e.target.value)} placeholder="641001" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Website</label>
+                <input className="form-input" value={form.website} onChange={e => set('website', e.target.value)} placeholder="www.example.com" />
               </div>
             </div>
           </div>
           <div className="modal-footer">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? <><div className="spinner" style={{ width: 16, height: 16 }} /> Creating...</> : <><Plus size={15} />Create Lead</>}
+              {loading ? <><div className="spinner" style={{ width: 16, height: 16 }} /> Creating...</> : <><Plus size={15} />Create Record</>}
             </button>
           </div>
         </form>
@@ -851,68 +780,13 @@ function CreateLeadModal({ onClose, onCreated }: { onClose: () => void; onCreate
   );
 }
 
-// ─── Note Panel ──────────────────────────────────────────────────────────────
-function NotePanel({ leadId, onClose }: { leadId: string; onClose: () => void }) {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [newNote, setNewNote] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    api.get(`/leads/${leadId}/notes`).then(r => setNotes(r.data)).catch(() => {});
-  }, [leadId]);
-
-  const addNote = async () => {
-    if (!newNote.trim()) return;
-    setLoading(true);
-    try {
-      await api.post(`/leads/${leadId}/notes`, { content: newNote });
-      const r = await api.get(`/leads/${leadId}/notes`);
-      setNotes(r.data);
-      setNewNote('');
-      toast.success('Note added');
-    } catch {
-      toast.error('Failed to add note');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="note-panel" style={{ marginTop: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontSize: 13, fontWeight: 600 }}>Notes</span>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}><X size={14} /></button>
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <textarea
-          value={newNote} onChange={e => setNewNote(e.target.value)}
-          placeholder="Type a note..." rows={2}
-          style={{ flex: 1, border: '1px solid #e5e7eb', borderRadius: 6, padding: '6px 10px', fontSize: 13, resize: 'none', outline: 'none' }}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNote(); } }}
-        />
-        <button className="btn-primary" onClick={addNote} disabled={loading} style={{ alignSelf: 'flex-end', padding: '6px 12px' }}>
-          {loading ? <div className="spinner" style={{ width: 14, height: 14 }} /> : 'Add'}
-        </button>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto' }}>
-        {notes.length === 0 ? <p style={{ fontSize: 12, color: '#9ca3af' }}>No notes yet</p> : notes.map(n => (
-          <div key={n._id} style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 10px' }}>
-            <p style={{ fontSize: 12.5, color: '#374151', marginBottom: 4 }}>{n.content}</p>
-            <p style={{ fontSize: 11, color: '#9ca3af' }}>{n.authorName} · {format(new Date(n.createdAt), 'MMM d, h:mm a')}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Row Actions Menu ─────────────────────────────────────────────────────────
-function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void; users: any[] }) {
+// ─── Row Actions Menu ────────────────────────────────────────────────────────
+function RowMenu({ record, onRefresh, users }: { record: IntecRecord; onRefresh: () => void; users: any[] }) {
   const { isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
-  const [submenu, setSubmenu] = useState<'labels' | 'date_followup' | 'date_install' | 'note' | 'assign' | null>(null);
+  const [submenu, setSubmenu] = useState<'labels' | 'date_followup' | 'date_install' | 'assign' | null>(null);
 
-  const [selectedLabels, setSelectedLabels] = useState<string[]>(lead.labels || []);
+  const [selectedLabels, setSelectedLabels] = useState<string[]>(record.labels || []);
   const [date, setDate] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -924,9 +798,9 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
       return;
     }
     try {
-      await api.put(`/leads/${lead._id}`, { assignedTo: adminUser._id });
-      await api.post(`/leads/${lead._id}/labels`, { labels: ['Review'] });
-      toast.success('Lead assigned to Admin for review');
+      await api.put(`/intec/${record._id}`, { assignedTo: adminUser._id });
+      await api.post(`/intec/${record._id}/labels`, { labels: ['Review'] });
+      toast.success('Record assigned to Admin for review');
       onRefresh();
       setOpen(false);
     } catch {
@@ -942,7 +816,7 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
 
   const saveLabels = async () => {
     try {
-      await api.post(`/leads/${lead._id}/labels`, { labels: selectedLabels });
+      await api.post(`/intec/${record._id}/labels`, { labels: selectedLabels });
       toast.success('Labels updated');
       onRefresh();
       setOpen(false);
@@ -951,39 +825,38 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
 
   const saveDate = async (type: 'followUpDate' | 'installationDate') => {
     try {
-      await api.post(`/leads/${lead._id}/date`, { [type]: date });
+      await api.post(`/intec/${record._id}/date`, { [type]: date });
       toast.success('Date set');
       onRefresh();
       setOpen(false);
     } catch { toast.error('Failed to set date'); }
   };
 
-  const assignLead = async (userId: string) => {
+  const assignRecord = async (userId: string) => {
     try {
-      await api.put(`/leads/${lead._id}`, { assignedTo: userId });
-      toast.success('Lead assigned');
+      await api.put(`/intec/${record._id}`, { assignedTo: userId });
+      toast.success('Record assigned');
       onRefresh();
       setOpen(false);
-    } catch { toast.error('Failed to assign lead'); }
+    } catch { toast.error('Failed to assign record'); }
   };
 
-
-  const convertLead = async () => {
+  const convertRecord = async () => {
     try {
-      await api.post(`/leads/${lead._id}/convert`);
-      toast.success('Lead marked as converted!');
+      await api.post(`/intec/${record._id}/convert`);
+      toast.success('Record marked as converted!');
       onRefresh();
       setOpen(false);
-    } catch { toast.error('Failed to convert lead'); }
+    } catch { toast.error('Failed to convert record'); }
   };
 
-  const deleteLead = async () => {
-    if (!confirm('Delete this lead? This cannot be undone.')) return;
+  const deleteRecord = async () => {
+    if (!confirm('Delete this record? This cannot be undone.')) return;
     try {
-      await api.delete(`/leads/${lead._id}`);
-      toast.success('Lead deleted');
+      await api.delete(`/intec/${record._id}`);
+      toast.success('Record deleted');
       onRefresh();
-    } catch { toast.error('Failed to delete lead'); }
+    } catch { toast.error('Failed to delete record'); }
   };
 
   return (
@@ -998,7 +871,7 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
       </button>
 
       {open && (
-        <div className="dropdown-menu" style={{ right: 0, top: '100%', minWidth: 200 }}>
+        <div className="dropdown-menu" style={{ right: 0, top: '100%', minWidth: 200, zIndex: 10 }}>
           {!submenu && (
             <>
               <div className="dropdown-item" onClick={() => setSubmenu('labels')}><Tag size={14} />Add Label</div>
@@ -1009,14 +882,14 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
               ) : (
                 <div className="dropdown-item" onClick={askReview}><User size={14} />Ask Review</div>
               )}
-              {!lead.isConverted && (
-                <div className="dropdown-item" onClick={convertLead}><CheckCircle size={14} />Mark as Converted</div>
+              {!record.isConverted && (
+                <div className="dropdown-item" onClick={convertRecord}><CheckCircle size={14} />Mark as Converted</div>
               )}
-              <div className="dropdown-item" onClick={() => { setSubmenu('note'); setOpen(false); setNoteOpen(true); }}><FileText size={14} />Add Note</div>
+              <div className="dropdown-item" onClick={() => { setOpen(false); setNoteOpen(true); }}><FileText size={14} />Add Note</div>
               {isAdmin && (
                 <>
                   <div style={{ height: 1, background: '#f0f2f7', margin: '4px 0' }} />
-                  <div className="dropdown-item danger" onClick={deleteLead}><Trash2 size={14} />Delete Lead</div>
+                  <div className="dropdown-item danger" onClick={deleteRecord}><Trash2 size={14} />Delete Record</div>
                 </>
               )}
             </>
@@ -1032,7 +905,6 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
                   {lbl}
                 </label>
               ))}
-
               <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
                 <button className="btn-primary" onClick={saveLabels} style={{ flex: 1, justifyContent: 'center', padding: '7px' }}>Apply</button>
                 <button className="btn-secondary" onClick={() => setSubmenu(null)} style={{ padding: '7px 10px' }}>Back</button>
@@ -1072,12 +944,12 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
                   <div 
                     key={u._id} 
                     className="dropdown-item" 
-                    onClick={() => assignLead(u._id)}
+                    onClick={() => assignRecord(u._id)}
                     style={{ 
                       fontSize: 13, 
                       padding: '8px 10px',
-                      background: lead.assignedTo?._id === u._id ? '#f0f7ff' : 'transparent',
-                      color: lead.assignedTo?._id === u._id ? '#1a73e8' : 'inherit'
+                      background: record.assignedTo?._id === u._id ? '#f0f7ff' : 'transparent',
+                      color: record.assignedTo?._id === u._id ? '#1a73e8' : 'inherit'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1091,7 +963,7 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
                         <div>{u.name}</div>
                         <div style={{ fontSize: 10, color: '#9ca3af' }}>{u.role}</div>
                       </div>
-                      {lead.assignedTo?._id === u._id && <CheckCircle size={12} />}
+                      {record.assignedTo?._id === u._id && <CheckCircle size={12} />}
                     </div>
                   </div>
                 ))}
@@ -1104,32 +976,54 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
         </div>
       )}
 
-
       {noteOpen && (
-        <div style={{ position: 'absolute', right: 0, top: '100%', width: 320, zIndex: 300 }}>
-          <NotePanel leadId={lead._id} onClose={() => setNoteOpen(false)} />
+        <div style={{ position: 'absolute', right: 0, top: '100%', width: 320, zIndex: 300 }} onClick={e => e.stopPropagation()}>
+          <div className="note-panel" style={{ marginTop: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Quick Note</span>
+              <button onClick={() => setNoteOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}><X size={14} /></button>
+            </div>
+            <textarea
+              placeholder="Type note and hit Save..."
+              rows={2}
+              style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '6px 10px', fontSize: 13, resize: 'none', outline: 'none', marginBottom: 8 }}
+              onKeyDown={async e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  const val = e.currentTarget.value;
+                  if (!val.trim()) return;
+                  try {
+                    await api.post(`/intec/${record._id}/notes`, { content: val });
+                    toast.success('Note added');
+                    setNoteOpen(false);
+                    onRefresh();
+                  } catch { toast.error('Failed to add note'); }
+                }
+              }}
+            />
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-// ─── Main Leads Page ──────────────────────────────────────────────────────────
-function LeadsPageContent() {
+// ─── Main Intec Page Content ─────────────────────────────────────────────────
+function IntecPageContent() {
   const { isAdmin, sidebarCollapsed } = useAuth();
   const searchParams = useSearchParams();
-  const urlView = searchParams.get('view'); // open | followup | dateset | installation | completed
+  const urlView = searchParams.get('view'); 
 
   const VIEW_TITLES: Record<string, string> = {
-    open: 'Open Leads',
-    followup: 'Follow Up Leads',
-    dateset: 'Date Set Leads',
-    installation: 'Installation Leads',
-    completed: 'Completed Leads',
+    open: 'Open Intec Records',
+    followup: 'Follow Up Intec',
+    dateset: 'Date Set Intec',
+    installation: 'Installation Intec',
+    completed: 'Completed Intec',
   };
-  const pageTitle = urlView ? (VIEW_TITLES[urlView] || 'Leads') : 'All Leads';
+  const pageTitle = urlView ? (VIEW_TITLES[urlView] || 'Intec') : 'All Intec Records';
 
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [records, setRecords] = useState<IntecRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
   const [page, setPage] = useState(1);
@@ -1139,53 +1033,47 @@ function LeadsPageContent() {
   const [showFilter, setShowFilter] = useState(false);
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
-  const [filterSource, setFilterSource] = useState('');
   const [filterLabel, setFilterLabel] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<IntecRecord | null>(null);
   const [drawerTab, setDrawerTab] = useState<'details' | 'notes' | 'log'>('details');
   const [users, setUsers] = useState<any[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-
   useEffect(() => {
     api.get('/users').then(r => setUsers(r.data)).catch(() => {});
   }, []);
 
-
-  // Reset page when view changes
   useEffect(() => { setPage(1); setSearch(''); }, [urlView]);
 
-  const fetchLeads = useCallback(async () => {
+  const fetchRecords = useCallback(async () => {
     setLoading(true);
     try {
       const params: Record<string, string> = { page: String(page), limit: '25', sortBy, sortOrder };
       if (search) params.search = search;
-      if (filterSource) params.source = filterSource;
       if (filterLabel) params.label = filterLabel;
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
 
-      // Apply view-based filters
       if (urlView === 'open')         { params.label = 'Open'; }
       if (urlView === 'followup')     { params.label = 'Follow Up'; }
       if (urlView === 'dateset')      { params.dateSet = 'true'; }
       if (urlView === 'installation') { params.installation = 'true'; }
       if (urlView === 'completed')    { params.converted = 'true'; }
 
-      const res = await api.get('/leads', { params });
-      setLeads(res.data.leads);
+      const res = await api.get('/intec', { params });
+      setRecords(res.data.intec);
       setTotal(res.data.total);
       setPages(res.data.pages);
     } catch {
-      toast.error('Failed to fetch leads');
+      toast.error('Failed to fetch Intec records');
     } finally {
       setLoading(false);
     }
-  }, [page, search, sortBy, sortOrder, filterSource, filterLabel, urlView, startDate, endDate]);
+  }, [page, search, sortBy, sortOrder, filterLabel, urlView, startDate, endDate]);
 
-  useEffect(() => { fetchLeads(); }, [fetchLeads]);
+  useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
   const toggleSort = (col: string) => {
     if (sortBy === col) setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
@@ -1199,32 +1087,131 @@ function LeadsPageContent() {
   );
 
   const toggleSelect = (id: string) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  const toggleAll = () => setSelectedIds(prev => prev.length === leads.length ? [] : leads.map(l => l._id));
+  const toggleAll = () => setSelectedIds(prev => prev.length === records.length ? [] : records.map(l => l._id));
+
+  // Client-side Excel parsing & uploading
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      toast.loading('Loading XLSX parser...');
+      const XLSX = await import('xlsx');
+      const reader = new FileReader();
+
+      reader.onload = async (evt) => {
+        try {
+          toast.loading('Parsing Excel columns...');
+          const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rows = XLSX.utils.sheet_to_json(worksheet);
+
+          if (rows.length === 0) {
+            toast.dismiss();
+            toast.error('Excel sheet is empty');
+            return;
+          }
+
+          toast.loading(`Importing ${rows.length} records...`);
+          await api.post('/intec/import', { records: rows });
+          toast.dismiss();
+          toast.success(`Successfully imported Intec records!`);
+          fetchRecords();
+        } catch (err: any) {
+          console.error(err);
+          toast.dismiss();
+          toast.error(err?.response?.data?.message || 'Error importing Excel records');
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    } catch (err) {
+      console.error(err);
+      toast.dismiss();
+      toast.error('Failed to parse file');
+    }
+    e.target.value = '';
+  };
+
+  // Client-side Excel generation & downloading
+  const handleExportExcel = async () => {
+    try {
+      toast.loading('Generating export dataset...');
+      const params: Record<string, string> = { limit: '100000', sortBy, sortOrder };
+      if (search) params.search = search;
+      if (filterLabel) params.label = filterLabel;
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+
+      if (urlView === 'open')         { params.label = 'Open'; }
+      if (urlView === 'followup')     { params.label = 'Follow Up'; }
+      if (urlView === 'dateset')      { params.dateSet = 'true'; }
+      if (urlView === 'installation') { params.installation = 'true'; }
+      if (urlView === 'completed')    { params.converted = 'true'; }
+
+      const res = await api.get('/intec', { params });
+      const exportItems = res.data.intec || [];
+
+      if (exportItems.length === 0) {
+        toast.dismiss();
+        toast.error('No records found to export');
+        return;
+      }
+
+      const XLSX = await import('xlsx');
+      const formatted = exportItems.map((r: any) => ({
+        'Hall Number': r.hallNumber || '',
+        'Stall Number': r.stallNumber || '',
+        'Company Name': r.companyName || '',
+        'Contact Person': r.contactPerson || '',
+        'Position': r.position || '',
+        'Email': r.email || '',
+        'Mobile 1': r.mobile1 || '',
+        'Mobile 2': r.mobile2 || '',
+        'Address': r.address || '',
+        'Country': r.country || '',
+        'State': r.state || '',
+        'Pincode': r.pincode || '',
+        'Website': r.website || '',
+        'Labels': (r.labels || []).join(', '),
+        'Status': r.status || '',
+        'Callback Date': r.callbackDate ? format(new Date(r.callbackDate), 'yyyy-MM-dd') : '',
+        'Follow Up Date': r.followUpDate ? format(new Date(r.followUpDate), 'yyyy-MM-dd') : '',
+        'Installation Date': r.installationDate ? format(new Date(r.installationDate), 'yyyy-MM-dd') : '',
+        'Assigned To': r.assignedTo?.name || 'Unassigned',
+        'Created At': format(new Date(r.createdAt), 'yyyy-MM-dd HH:mm'),
+      }));
+
+      const sheet = XLSX.utils.json_to_sheet(formatted);
+      const book = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(book, sheet, 'Intec Leads');
+
+      XLSX.writeFile(book, `Intec_Leads_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.dismiss();
+      toast.success('Excel file exported successfully!');
+    } catch (err) {
+      console.error(err);
+      toast.dismiss();
+      toast.error('Failed to export Excel file');
+    }
+  };
 
   return (
     <ProtectedLayout>
-      <TopBar title={pageTitle} onRefresh={fetchLeads}>
+      <TopBar title={pageTitle} onRefresh={fetchRecords}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {isAdmin && (
             <button
               className={filterLabel === 'Review' ? 'btn-danger' : 'btn-secondary'}
               onClick={() => {
-                if (filterLabel === 'Review') {
-                  setFilterLabel('');
-                } else {
-                  setFilterLabel('Review');
-                }
+                setFilterLabel(prev => prev === 'Review' ? '' : 'Review');
                 setPage(1);
               }}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                ...(filterLabel === 'Review' ? {
-                  background: '#fee2e2',
-                  color: '#b91c1c',
-                  borderColor: '#fca5a5'
-                } : {})
+                display: 'flex', alignItems: 'center', gap: 6,
+                ...(filterLabel === 'Review' ? { background: '#fee2e2', color: '#b91c1c', borderColor: '#fca5a5' } : {})
               }}
             >
               <AlertCircle size={14} style={filterLabel === 'Review' ? { color: '#b91c1c' } : {}} />
@@ -1232,25 +1219,32 @@ function LeadsPageContent() {
             </button>
           )}
           <button className="btn-secondary" onClick={() => setShowFilter(!showFilter)}><Filter size={14} />Filter</button>
-          <button className="btn-primary" onClick={() => setShowCreate(true)}><Plus size={15} />Create Lead</button>
+          
+          <input
+            type="file"
+            id="intec-excel-import"
+            accept=".xlsx,.xls,.csv"
+            onChange={handleImportExcel}
+            style={{ display: 'none' }}
+          />
+          <label htmlFor="intec-excel-import" className="btn-secondary" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Upload size={14} /> Import Excel
+          </label>
+
+          <button className="btn-secondary" onClick={handleExportExcel} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Download size={14} /> Export Excel
+          </button>
+
+          <button className="btn-primary" onClick={() => setShowCreate(true)}><Plus size={15} />Create Record</button>
         </div>
       </TopBar>
 
       <div style={{ display: 'flex', position: 'relative' }}>
-        {/* Filter Panel */}
         {showFilter && (
           <div className="filter-panel" style={{ left: sidebarCollapsed ? 64 : 240 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <span style={{ fontWeight: 600, fontSize: 14 }}>Filters</span>
               <button onClick={() => setShowFilter(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={16} /></button>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 14 }}>
-              <label className="form-label">Lead Source</label>
-              <select className="form-select" value={filterSource} onChange={e => { setFilterSource(e.target.value); setPage(1); }}>
-                <option value="">All Sources</option>
-                {SOURCE_OPTIONS.map(s => <option key={s}>{s}</option>)}
-              </select>
             </div>
 
             <div className="form-group" style={{ marginBottom: 14 }}>
@@ -1261,19 +1255,18 @@ function LeadsPageContent() {
               </select>
             </div>
 
-            <button className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { setFilterSource(''); setFilterLabel(''); setPage(1); }}>
+            <button className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { setFilterLabel(''); setPage(1); }}>
               Clear Filters
             </button>
           </div>
         )}
 
-        {/* Content */}
         <div style={{ flex: 1, padding: 24, marginLeft: showFilter ? 280 : 0, transition: 'margin-left 0.2s' }}>
           {/* Search bar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative' }}>
               <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-              <input className="search-bar" placeholder="Search leads..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+              <input className="search-bar" placeholder="Search Intec records..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1300,7 +1293,7 @@ function LeadsPageContent() {
               )}
             </div>
 
-            <span style={{ fontSize: 13, color: '#6b7280', marginLeft: 'auto' }}>{total} leads</span>
+            <span style={{ fontSize: 13, color: '#6b7280', marginLeft: 'auto' }}>{total} records</span>
             {selectedIds.length > 0 && (
               <span style={{ fontSize: 13, color: '#1a73e8', fontWeight: 500 }}>{selectedIds.length} selected</span>
             )}
@@ -1309,25 +1302,24 @@ function LeadsPageContent() {
           {/* Table */}
           <div className="card" style={{ padding: 0 }}>
             {loading ? (
-              <div className="empty-state"><div className="spinner spinner-dark" style={{ width: 32, height: 32 }} /><p>Loading leads...</p></div>
-            ) : leads.length === 0 ? (
+              <div className="empty-state"><div className="spinner spinner-dark" style={{ width: 32, height: 32 }} /><p>Loading records...</p></div>
+            ) : records.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon"><Search size={28} color="#9ca3af" /></div>
-                <p style={{ fontWeight: 600, color: '#374151' }}>No leads found</p>
-                <p style={{ fontSize: 13 }}>Create your first lead or adjust your filters</p>
-                <button className="btn-primary" onClick={() => setShowCreate(true)}><Plus size={14} />Create Lead</button>
+                <p style={{ fontWeight: 600, color: '#374151' }}>No Intec records found</p>
+                <p style={{ fontSize: 13 }}>Create your first record, import an Excel sheet, or adjust filters</p>
+                <button className="btn-primary" onClick={() => setShowCreate(true)}><Plus size={14} />Create Record</button>
               </div>
             ) : (
               <div>
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 40 }}><input type="checkbox" checked={selectedIds.length === leads.length} onChange={toggleAll} /></th>
-                      <th onClick={() => toggleSort('firstName')} style={{ cursor: 'pointer' }}>Lead Name <SortIcon col="firstName" /></th>
-                      <th onClick={() => toggleSort('company')} style={{ cursor: 'pointer' }}>Company <SortIcon col="company" /></th>
-                      <th>Reason</th>
-                      <th>Phone</th>
-                      <th>License #</th>
+                      <th style={{ width: 40 }}><input type="checkbox" checked={selectedIds.length === records.length} onChange={toggleAll} /></th>
+                      <th onClick={() => toggleSort('companyName')} style={{ cursor: 'pointer' }}>Company / Contact <SortIcon col="companyName" /></th>
+                      <th onClick={() => toggleSort('hallNumber')} style={{ cursor: 'pointer' }}>Hall / Stall <SortIcon col="hallNumber" /></th>
+                      <th style={{ width: 160 }}>Designation / Email</th>
+                      <th>Mobiles</th>
                       <th>Labels</th>
                       <th>Assigned</th>
                       <th onClick={() => toggleSort('createdAt')} style={{ cursor: 'pointer' }}>Created <SortIcon col="createdAt" /></th>
@@ -1336,48 +1328,57 @@ function LeadsPageContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {leads.map(lead => (
-                      <tr key={lead._id} onClick={() => setSelectedLead(lead)}>
-                        <td onClick={e => e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(lead._id)} onChange={() => toggleSelect(lead._id)} /></td>
+                    {records.map(record => (
+                      <tr key={record._id} onClick={() => setSelectedRecord(record)}>
+                        <td onClick={e => e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(record._id)} onChange={() => toggleSelect(record._id)} /></td>
                         <td>
-                          <div style={{ fontWeight: 500 }}>{lead.firstName} {lead.lastName}</div>
+                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{record.companyName || '—'}</div>
+                          <div style={{ fontSize: 12, color: '#6b7280' }}>{record.contactPerson || '—'}</div>
                         </td>
-                        <td>{lead.company || '—'}</td>
-                        <td style={{ color: '#6b7280', fontSize: 13 }}>{lead.reason || '—'}</td>
-                        <td>{lead.phone || '—'}</td>
-                        <td>{lead.licenseNumber || '—'}</td>
+                        <td>
+                          <div style={{ fontWeight: 500 }}>H: {record.hallNumber || '—'}</div>
+                          <div style={{ fontSize: 12, color: '#6b7280' }}>S: {record.stallNumber || '—'}</div>
+                        </td>
+                        <td style={{ maxWidth: 160 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={record.position || ''}>{record.position || '—'}</div>
+                          <div style={{ fontSize: 12, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={record.email || ''}>{record.email || '—'}</div>
+                        </td>
+                        <td>
+                          <div style={{ fontSize: 13 }}>{record.mobile1 || '—'}</div>
+                          {record.mobile2 && <div style={{ fontSize: 12, color: '#6b7280' }}>{record.mobile2}</div>}
+                        </td>
                         <td>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            {lead.isConverted ? (
+                            {record.isConverted ? (
                               <span className="badge badge-converted">Converted</span>
                             ) : (
-                              (lead.labels || []).map(l => (
+                              (record.labels || []).map(l => (
                                 <span key={l} className={LABEL_CLASSES[l] || 'badge'}>{l}</span>
                               ))
                             )}
                           </div>
                         </td>
                         <td>
-                          {lead.assignedTo ? (
+                          {record.assignedTo ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <div style={{ 
                                 width: 22, height: 22, borderRadius: '50%', background: '#e0e7ff', color: '#4338ca',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700
                               }}>
-                                {lead.assignedTo.name.split(' ').map(n => n[0]).join('')}
+                                {record.assignedTo.name.split(' ').map(n => n[0]).join('')}
                               </div>
-                              <span style={{ fontSize: 12.5, color: '#374151' }}>{lead.assignedTo.name}</span>
+                              <span style={{ fontSize: 12.5, color: '#374151' }}>{record.assignedTo.name}</span>
                             </div>
                           ) : (
                             <span style={{ color: '#9ca3af', fontSize: 12.5 }}>Unassigned</span>
                           )}
                         </td>
                         <td style={{ whiteSpace: 'nowrap', color: '#6b7280', fontSize: 12.5 }}>
-                          {format(new Date(lead.createdAt), 'MMM d, yyyy')}
+                          {format(new Date(record.createdAt), 'MMM d, yyyy')}
                         </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {lead.installationDate ? (
+                            {record.installationDate ? (
                               <div style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 5,
                                 background: '#f0fdf4', border: '1px solid #bbf7d0',
@@ -1385,10 +1386,10 @@ function LeadsPageContent() {
                               }}>
                                 <Calendar size={11} style={{ color: '#166534', flexShrink: 0 }} />
                                 <span style={{ fontSize: 11, fontWeight: 600, color: '#166534' }}>
-                                  {format(new Date(lead.installationDate), 'MMM d')}
+                                  {format(new Date(record.installationDate), 'MMM d')}
                                 </span>
                               </div>
-                            ) : lead.followUpDate ? (
+                            ) : record.followUpDate ? (
                               <div style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 5,
                                 background: '#fffbeb', border: '1px solid #fde68a',
@@ -1396,10 +1397,10 @@ function LeadsPageContent() {
                               }}>
                                 <Clock size={11} style={{ color: '#b45309', flexShrink: 0 }} />
                                 <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309' }}>
-                                  {format(new Date(lead.followUpDate), 'MMM d')}
+                                  {format(new Date(record.followUpDate), 'MMM d')}
                                 </span>
                               </div>
-                            ) : lead.callbackDate ? (
+                            ) : record.callbackDate ? (
                               <div style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 5,
                                 background: '#eff6ff', border: '1px solid #bfdbfe',
@@ -1407,24 +1408,24 @@ function LeadsPageContent() {
                               }}>
                                 <Calendar size={11} style={{ color: '#1d4ed8', flexShrink: 0 }} />
                                 <span style={{ fontSize: 11, fontWeight: 600, color: '#1d4ed8' }}>
-                                  {format(new Date(lead.callbackDate), 'MMM d')}
+                                  {format(new Date(record.callbackDate), 'MMM d')}
                                 </span>
                               </div>
                             ) : null}
 
-                            {(lead.noteCount || 0) > 0 && (
+                            {(record.noteCount || 0) > 0 && (
                               <button 
-                                onClick={(e) => { e.stopPropagation(); setSelectedLead(lead); setDrawerTab('notes'); }}
+                                onClick={(e) => { e.stopPropagation(); setSelectedRecord(record); setDrawerTab('notes'); }}
                                 style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', padding: '3px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
-                                title={`${lead.noteCount} Note(s)`}
+                                title={`${record.noteCount} Note(s)`}
                               >
-                                <FileText size={12} /> {lead.noteCount}
+                                <FileText size={12} /> {record.noteCount}
                               </button>
                             )}
                           </div>
                         </td>
                         <td onClick={e => e.stopPropagation()}>
-                          <RowMenu lead={lead} onRefresh={fetchLeads} users={users} />
+                          <RowMenu record={record} onRefresh={fetchRecords} users={users} />
                         </td>
                       </tr>
                     ))}
@@ -1451,24 +1452,23 @@ function LeadsPageContent() {
         </div>
       </div>
 
-      {showCreate && <CreateLeadModal onClose={() => setShowCreate(false)} onCreated={fetchLeads} />}
-      {selectedLead && (
-        <LeadDrawer
-          lead={selectedLead}
+      {showCreate && <CreateIntecModal onClose={() => setShowCreate(false)} onCreated={fetchRecords} />}
+      {selectedRecord && (
+        <IntecDrawer
+          record={selectedRecord}
           defaultTab={drawerTab}
-          onClose={() => { setSelectedLead(null); setDrawerTab('details'); }}
-          onRefresh={(updatedLead) => {
-            fetchLeads();
-            if (updatedLead) setSelectedLead(updatedLead);
+          onClose={() => { setSelectedRecord(null); setDrawerTab('details'); }}
+          onRefresh={(updatedRecord) => {
+            fetchRecords();
+            if (updatedRecord) setSelectedRecord(updatedRecord);
           }}
         />
       )}
-
     </ProtectedLayout>
   );
 }
 
-export default function LeadsPage() {
+export default function IntecPage() {
   return (
     <Suspense fallback={
       <div className="empty-state">
@@ -1476,7 +1476,7 @@ export default function LeadsPage() {
         <p>Loading...</p>
       </div>
     }>
-      <LeadsPageContent />
+      <IntecPageContent />
     </Suspense>
   );
 }

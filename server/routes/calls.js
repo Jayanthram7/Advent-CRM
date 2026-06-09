@@ -22,10 +22,23 @@ router.get('/', async (req, res) => {
       converted,
       source,
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
+      startDate,
+      endDate
     } = req.query;
 
     let query = {};
+
+    // Date range filter
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate + 'T00:00:00');
+      }
+      if (endDate) {
+        query.createdAt.$lte = new Date(endDate + 'T23:59:59.999');
+      }
+    }
 
     // Role-based filtering: Agents only see their assigned calls
     if (req.user.role === 'Agent') {

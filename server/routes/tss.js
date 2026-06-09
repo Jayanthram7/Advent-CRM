@@ -65,6 +65,17 @@ router.get('/datasets/:id/records', async (req, res) => {
 
     const query = { datasetId: req.params.id };
 
+    const { startDate, endDate } = req.query;
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate + 'T00:00:00');
+      }
+      if (endDate) {
+        query.createdAt.$lte = new Date(endDate + 'T23:59:59.999');
+      }
+    }
+
     if (req.query.view) {
       const view = req.query.view;
       if (view === 'open') {

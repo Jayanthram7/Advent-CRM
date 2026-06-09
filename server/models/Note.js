@@ -9,6 +9,10 @@ const noteSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Call'
   },
+  intec: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Intec'
+  },
   content: {
     type: String,
     required: true,
