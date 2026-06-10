@@ -5,8 +5,13 @@ const User = require('../models/User');
 const AdminSetting = require('../models/AdminSetting');
 const LoginLog = require('../models/LoginLog');
 const authMiddleware = require('../middleware/authMiddleware');
-
 const roleMiddleware = require('../middleware/roleMiddleware');
+
+const Lead = require('../models/Lead');
+const Call = require('../models/Call');
+const Intec = require('../models/Intec');
+const TssRecord = require('../models/TssRecord');
+const TssDataset = require('../models/TssDataset');
 
 router.use(authMiddleware);
 
@@ -21,6 +26,166 @@ router.get('/', async (req, res) => {
 });
 
 router.use(roleMiddleware('Admin'));
+
+// GET /api/users/customers - aggregate customer details from Leads, Calls, Intec, and TSS
+router.get('/customers', async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 25,
+      search = '',
+      label = '',
+      status = '',
+      source = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    const [leads, calls, intecs, tssRecords] = await Promise.all([
+      Lead.find().lean(),
+      Call.find().lean(),
+      Intec.find().lean(),
+      TssRecord.find().populate('datasetId', 'name').lean()
+    ]);
+
+    const unified = [];
+
+    // Map Leads
+    leads.forEach(l => {
+      unified.push({
+        _id: `leads_${l._id}`,
+        originalId: l._id,
+        source: 'leads',
+        name: `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'N/A',
+        company: l.company || 'N/A',
+        email: l.email || 'N/A',
+        phone: l.phone || l.secondaryPhone || 'N/A',
+        status: l.status || 'Open',
+        labels: l.labels || [],
+        createdAt: l.createdAt
+      });
+    });
+
+    // Map Calls
+    calls.forEach(c => {
+      unified.push({
+        _id: `calls_${c._id}`,
+        originalId: c._id,
+        source: 'calls',
+        name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'N/A',
+        company: c.company || 'N/A',
+        email: c.email || 'N/A',
+        phone: c.phone || c.secondaryPhone || 'N/A',
+        status: c.status || 'Open',
+        labels: c.labels || [],
+        createdAt: c.createdAt
+      });
+    });
+
+    // Map Intec
+    intecs.forEach(i => {
+      unified.push({
+        _id: `intec_${i._id}`,
+        originalId: i._id,
+        source: 'intec',
+        name: i.contactPerson || 'N/A',
+        company: i.companyName || 'N/A',
+        email: i.email || 'N/A',
+        phone: i.mobile1 || i.mobile2 || 'N/A',
+        status: i.status || 'Open',
+        labels: i.labels || [],
+        createdAt: i.createdAt
+      });
+    });
+
+    // Map TSS Records
+    tssRecords.forEach(t => {
+      unified.push({
+        _id: `tss_${t._id}`,
+        originalId: t._id,
+        datasetId: t.datasetId?._id || null,
+        datasetName: t.datasetId?.name || 'TSS Dataset',
+        source: 'tss',
+        name: t.customerName || 'N/A',
+        company: t.serialNumber ? `SN: ${t.serialNumber}` : (t.flavour || 'N/A'),
+        email: 'N/A',
+        phone: t.mobileNumber || 'N/A',
+        status: t.status || 'Open',
+        labels: t.labels || [],
+        createdAt: t.createdAt
+      });
+    });
+
+    let filtered = unified;
+
+    // Filter by source
+    if (source) {
+      filtered = filtered.filter(item => item.source === source);
+    }
+
+    // Filter by status
+    if (status) {
+      filtered = filtered.filter(item => item.status.toLowerCase() === status.toLowerCase());
+    }
+
+    // Filter by label
+    if (label) {
+      const selectedLabels = label.split(',').map(l => l.trim().toLowerCase());
+      filtered = filtered.filter(item => 
+        item.labels.some(lbl => selectedLabels.includes(lbl.toLowerCase()))
+      );
+    }
+
+    // Filter by search query
+    if (search) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter(item => 
+        item.name.toLowerCase().includes(q) ||
+        item.company.toLowerCase().includes(q) ||
+        item.email.toLowerCase().includes(q) ||
+        item.phone.toLowerCase().includes(q)
+      );
+    }
+
+    // Sort records
+    filtered.sort((a, b) => {
+      let valA = a[sortBy];
+      let valB = b[sortBy];
+
+      if (sortBy === 'createdAt') {
+        const timeA = valA ? new Date(valA).getTime() : 0;
+        const timeB = valB ? new Date(valB).getTime() : 0;
+        return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+
+      valA = String(valA || '').toLowerCase();
+      valB = String(valB || '').toLowerCase();
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    // Paginate
+    const total = filtered.length;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const pages = Math.ceil(total / limitNum);
+    const skip = (pageNum - 1) * limitNum;
+    const paginated = filtered.slice(skip, skip + limitNum);
+
+    res.json({
+      customers: paginated,
+      total,
+      page: pageNum,
+      pages,
+      limit: limitNum
+    });
+  } catch (err) {
+    console.error('Error fetching customers:', err);
+    res.status(500).json({ message: 'Server error fetching customer records' });
+  }
+});
 
 // POST /api/users
 router.post('/', async (req, res) => {

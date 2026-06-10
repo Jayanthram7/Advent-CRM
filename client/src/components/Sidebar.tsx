@@ -6,7 +6,7 @@ import {
   Home, Users, Target, LogOut,
   ChevronDown, ChevronRight, ChevronLeft, Circle,
   Inbox, Clock, Calendar, CheckCircle2,
-  Database, Upload, FileText, X, Phone, Building2
+  Database, Upload, FileText, X, Phone, Building2, Contact
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -62,9 +62,10 @@ export default function Sidebar() {
   const [adminAuthStep, setAdminAuthStep] = useState(0); // 0=closed, 1=user/pass, 2=pin
   const [adminForm, setAdminForm] = useState({ username: '', password: '', pin: '' });
   const [adminAuthLoading, setAdminAuthLoading] = useState(false);
+  const [adminTargetRoute, setAdminTargetRoute] = useState('/users');
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/tss/datasets', {
+    fetch('/api/tss/datasets', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
       .then(res => res.json())
@@ -113,7 +114,7 @@ export default function Sidebar() {
     e.preventDefault();
     setTssAuthLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/tss/settings/verify', {
+      const res = await fetch('/api/tss/settings/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
         body: JSON.stringify(tssForm)
@@ -138,7 +139,7 @@ export default function Sidebar() {
     e.preventDefault();
     setAdminAuthLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/users/settings/verify', {
+      const res = await fetch('/api/users/settings/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
         body: JSON.stringify({ username: adminForm.username, password: adminForm.password })
@@ -157,7 +158,7 @@ export default function Sidebar() {
     if (adminForm.pin === '1811') {
       setAdminAuthStep(0);
       setAdminForm({ username: '', password: '', pin: '' });
-      router.push('/users');
+      router.push(adminTargetRoute);
     } else {
       alert('Invalid PIN');
     }
@@ -394,20 +395,35 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Admin */}
         {isAdmin && (
           <>
             {!sidebarCollapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />}
             <div className="sidebar-section-title">Admin</div>
             <div
               onClick={() => {
-                if (pathname !== '/users') setAdminAuthStep(1);
+                if (pathname !== '/users') {
+                  setAdminTargetRoute('/users');
+                  setAdminAuthStep(1);
+                }
               }}
               className={`sidebar-item ${pathname === '/users' ? 'active' : ''}`}
               style={{ cursor: 'pointer', display: 'flex', justifyContent: sidebarCollapsed ? 'center' : 'flex-start' }}
             >
               <Users size={15} />
               <span className="sidebar-item-text">Users</span>
+            </div>
+            <div
+              onClick={() => {
+                if (pathname !== '/customers') {
+                  setAdminTargetRoute('/customers');
+                  setAdminAuthStep(1);
+                }
+              }}
+              className={`sidebar-item ${pathname === '/customers' ? 'active' : ''}`}
+              style={{ cursor: 'pointer', display: 'flex', justifyContent: sidebarCollapsed ? 'center' : 'flex-start', marginTop: 4 }}
+            >
+              <Contact size={15} />
+              <span className="sidebar-item-text">Customers</span>
             </div>
           </>
         )}
@@ -551,7 +567,7 @@ function TssImportModal({ onClose }: { onClose: () => void }) {
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
           const records = XLSX.utils.sheet_to_json(firstSheet);
 
-          const res = await fetch('http://localhost:5000/api/tss/import', {
+          const res = await fetch('/api/tss/import', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
