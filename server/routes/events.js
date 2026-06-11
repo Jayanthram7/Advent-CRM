@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const Intec = require('../models/Intec');
+const EventDataset = require('../models/EventDataset');
+const EventRecord = require('../models/EventRecord');
 const Note = require('../models/Note');
 const Activity = require('../models/Activity');
 const { Resend } = require('resend');
@@ -8,11 +9,60 @@ const { Resend } = require('resend');
 const resend = new Resend('re_LSfRqxrV_9dAg5rmMmoe6kHDJxzBCkThR');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// All routes require authentication
 router.use(authMiddleware);
 
-// GET /api/intec - list records with filters and pagination
-router.get('/', async (req, res) => {
+// GET /api/events/datasets - Get all events/datasets
+router.get('/datasets', async (req, res) => {
+  try {
+    const datasets = await EventDataset.find().sort({ createdAt: -1 });
+    res.json(datasets);
+  } catch (err) {
+    console.error('Get datasets error:', err);
+    res.status(500).json({ message: 'Server error fetching event datasets' });
+  }
+});
+
+// GET /api/events/datasets/:id - Get a single event dataset info
+router.get('/datasets/:id', async (req, res) => {
+  try {
+    const dataset = await EventDataset.findById(req.params.id);
+    if (!dataset) return res.status(404).json({ message: 'Event dataset not found' });
+    res.json(dataset);
+  } catch (err) {
+    console.error('Get dataset error:', err);
+    res.status(500).json({ message: 'Server error fetching event dataset' });
+  }
+});
+
+// DELETE /api/events/datasets/:id - Delete an entire event dataset and all its records
+router.delete('/datasets/:id', async (req, res) => {
+  if (req.user.role !== 'Admin') {
+    return res.status(403).json({ message: 'Only admins can delete an event dataset' });
+  }
+
+  try {
+    const dataset = await EventDataset.findByIdAndDelete(req.params.id);
+    if (!dataset) {
+      return res.status(404).json({ message: 'Event dataset not found' });
+    }
+
+    // Find and delete all records, notes, and activities
+    const records = await EventRecord.find({ datasetId: req.params.id }).select('_id');
+    const recordIds = records.map(r => r._id);
+
+    await Note.deleteMany({ eventRecord: { $in: recordIds } });
+    await Activity.deleteMany({ eventRecord: { $in: recordIds } });
+    await EventRecord.deleteMany({ datasetId: req.params.id });
+
+    res.json({ message: 'Event dataset and all associated records deleted successfully' });
+  } catch (err) {
+    console.error('Delete dataset error:', err);
+    res.status(500).json({ message: 'Server error deleting event dataset' });
+  }
+});
+
+// GET /api/events/datasets/:id/records - list records of a specific dataset/event with filters & pagination
+router.get('/datasets/:id/records', async (req, res) => {
   try {
     const {
       page = 1,
@@ -26,7 +76,7 @@ router.get('/', async (req, res) => {
       endDate
     } = req.query;
 
-    let query = {};
+    let query = { datasetId: req.params.id };
 
     // Date range filter
     if (startDate || endDate) {
@@ -105,22 +155,22 @@ router.get('/', async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const [records, total] = await Promise.all([
-      Intec.find(query)
+      EventRecord.find(query)
         .sort(sortOptions)
         .skip(skip)
         .limit(parseInt(limit))
         .populate('assignedTo', 'name email')
         .populate('createdBy', 'name email'),
-      Intec.countDocuments(query)
+      EventRecord.countDocuments(query)
     ]);
 
     const recordsWithNotes = await Promise.all(records.map(async (record) => {
-      const noteCount = await Note.countDocuments({ intec: record._id });
+      const noteCount = await Note.countDocuments({ eventRecord: record._id });
       return { ...record.toObject(), noteCount };
     }));
 
     res.json({
-      intec: recordsWithNotes,
+      records: recordsWithNotes,
       total,
       page: parseInt(page),
       pages: Math.ceil(total / parseInt(limit)),
@@ -128,24 +178,44 @@ router.get('/', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Get intec records error:', err);
-    res.status(500).json({ message: 'Server error fetching Intec records' });
+    console.error('Get event records error:', err);
+    res.status(500).json({ message: 'Server error fetching event records' });
   }
 });
 
-// POST /api/intec - create a record
-router.post('/', async (req, res) => {
+// GET /api/events/records/:id - get a single EventRecord
+router.get('/records/:id', async (req, res) => {
+  try {
+    const record = await EventRecord.findById(req.params.id)
+      .populate('assignedTo', 'name email')
+      .populate('createdBy', 'name email');
+    if (!record) {
+      return res.status(404).json({ message: 'Record not found' });
+    }
+    res.json(record);
+  } catch (err) {
+    console.error('Get event record error:', err);
+    res.status(500).json({ message: 'Server error fetching event record' });
+  }
+});
+
+// POST /api/events/records - create a record
+router.post('/records', async (req, res) => {
   try {
     const {
-      hallNumber, stallNumber, companyName, contactPerson, position,
+      datasetId, hallNumber, stallNumber, companyName, contactPerson, position,
       email, mobile1, mobile2, address, country, state, pincode, website, labels
     } = req.body;
 
+    if (!datasetId) {
+      return res.status(400).json({ message: 'datasetId (Event ID) is required' });
+    }
     if (!companyName || !contactPerson) {
       return res.status(400).json({ message: 'Company name and contact person are required' });
     }
 
-    const record = await Intec.create({
+    const record = await EventRecord.create({
+      datasetId,
       hallNumber,
       stallNumber,
       companyName,
@@ -166,7 +236,7 @@ router.post('/', async (req, res) => {
 
     // Log Activity: Creation
     await Activity.create({
-      intec: record._id,
+      eventRecord: record._id,
       type: 'Creation',
       content: `Record created by ${req.user.name}`,
       performedBy: req.user._id
@@ -179,7 +249,7 @@ router.post('/', async (req, res) => {
           from: 'Advent Systems <jayanthramnithin@gmail.com>',
           to: email,
           subject: 'Welcome to Advent Systems',
-          html: `<h3>Dear ${contactPerson},</h3><p>Thank you for connecting with us at Intec exhibition. We look forward to working with you.</p>`
+          html: `<h3>Dear ${contactPerson},</h3><p>Thank you for connecting with us at event exhibition. We look forward to working with you.</p>`
         });
       } catch (emailErr) {
         console.error('Failed to send welcome email:', emailErr);
@@ -188,18 +258,24 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(record);
   } catch (err) {
-    console.error('Create Intec record error:', err);
-    res.status(500).json({ message: 'Server error creating Intec record' });
+    console.error('Create Event record error:', err);
+    res.status(500).json({ message: 'Server error creating Event record' });
   }
 });
 
-// POST /api/intec/import - bulk import Intec records from parsed Excel
+// POST /api/events/import - bulk import Event records from parsed Excel
 router.post('/import', async (req, res) => {
   try {
-    const { records } = req.body;
+    const { name, records } = req.body;
+    if (!name) {
+      return res.status(400).json({ message: 'Event Name is required' });
+    }
     if (!records || !Array.isArray(records)) {
       return res.status(400).json({ message: 'Records array is required' });
     }
+
+    // Create Dataset
+    const dataset = await EventDataset.create({ name });
 
     const bulkRecords = records.map(record => {
       const getVal = (possibleKeys) => {
@@ -216,6 +292,7 @@ router.post('/import', async (req, res) => {
       };
 
       return {
+        datasetId: dataset._id,
         hallNumber: getVal(['Hall Number', 'HallNo', 'Hall']),
         stallNumber: getVal(['Stall Number', 'StallNo', 'Stall']),
         companyName: getVal(['Company Name', 'Company', 'CompanyName', 'Company_Name']),
@@ -237,31 +314,33 @@ router.post('/import', async (req, res) => {
     }).filter(r => r.companyName || r.contactPerson); // require at least company or contact to import
 
     if (bulkRecords.length === 0) {
+      // Clean up dataset if no valid records
+      await EventDataset.findByIdAndDelete(dataset._id);
       return res.status(400).json({ message: 'No valid records with Company Name or Contact Person found' });
     }
 
-    const inserted = await Intec.insertMany(bulkRecords);
+    const inserted = await EventRecord.insertMany(bulkRecords);
 
     // Create activity logs for imports
     const activities = inserted.map(item => ({
-      intec: item._id,
+      eventRecord: item._id,
       type: 'Creation',
       content: `Record imported via Excel by ${req.user.name}`,
       performedBy: req.user._id
     }));
     await Activity.insertMany(activities);
 
-    res.status(201).json({ success: true, count: inserted.length });
+    res.status(201).json({ success: true, datasetId: dataset._id, count: inserted.length });
   } catch (err) {
-    console.error('Import Intec records error:', err);
+    console.error('Import Event records error:', err);
     res.status(500).json({ message: 'Server error during Excel import' });
   }
 });
 
-// PUT /api/intec/:id - update a record
-router.put('/:id', async (req, res) => {
+// PUT /api/events/records/:id - update a record
+router.put('/records/:id', async (req, res) => {
   try {
-    const record = await Intec.findByIdAndUpdate(
+    const record = await EventRecord.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true, runValidators: true }
@@ -276,14 +355,14 @@ router.put('/:id', async (req, res) => {
       const User = require('../models/User');
       const assignedUser = await User.findById(req.body.assignedTo);
       await Activity.create({
-        intec: record._id,
+        eventRecord: record._id,
         type: 'Assignment',
         content: `Record assigned to ${assignedUser ? assignedUser.name : 'Unknown User'} by ${req.user.name}`,
         performedBy: req.user._id
       });
     } else {
       await Activity.create({
-        intec: record._id,
+        eventRecord: record._id,
         type: 'Update',
         content: `Record details updated by ${req.user.name}`,
         performedBy: req.user._id
@@ -292,33 +371,33 @@ router.put('/:id', async (req, res) => {
 
     res.json(record);
   } catch (err) {
-    console.error('Update Intec error:', err);
-    res.status(500).json({ message: 'Server error updating Intec record' });
+    console.error('Update Event error:', err);
+    res.status(500).json({ message: 'Server error updating Event record' });
   }
 });
 
-// DELETE /api/intec/:id
-router.delete('/:id', async (req, res) => {
+// DELETE /api/events/records/:id
+router.delete('/records/:id', async (req, res) => {
   try {
-    const record = await Intec.findByIdAndDelete(req.params.id);
+    const record = await EventRecord.findByIdAndDelete(req.params.id);
     if (!record) {
       return res.status(404).json({ message: 'Record not found' });
     }
     // Delete associated notes and activities
-    await Note.deleteMany({ intec: req.params.id });
-    await Activity.deleteMany({ intec: req.params.id });
+    await Note.deleteMany({ eventRecord: req.params.id });
+    await Activity.deleteMany({ eventRecord: req.params.id });
     res.json({ message: 'Record deleted successfully' });
   } catch (err) {
-    console.error('Delete Intec error:', err);
-    res.status(500).json({ message: 'Server error deleting Intec record' });
+    console.error('Delete Event error:', err);
+    res.status(500).json({ message: 'Server error deleting Event record' });
   }
 });
 
-// POST /api/intec/:id/labels - update labels
-router.post('/:id/labels', async (req, res) => {
+// POST /api/events/records/:id/labels - update labels
+router.post('/records/:id/labels', async (req, res) => {
   try {
     const { labels } = req.body;
-    const record = await Intec.findByIdAndUpdate(
+    const record = await EventRecord.findByIdAndUpdate(
       req.params.id,
       { labels },
       { new: true }
@@ -327,7 +406,7 @@ router.post('/:id/labels', async (req, res) => {
 
     // Log Activity: Labels
     await Activity.create({
-      intec: record._id,
+      eventRecord: record._id,
       type: 'Label',
       content: `Labels updated to: ${labels.join(', ')} by ${req.user.name}`,
       performedBy: req.user._id
@@ -339,10 +418,10 @@ router.post('/:id/labels', async (req, res) => {
   }
 });
 
-// POST /api/intec/:id/convert - mark as converted
-router.post('/:id/convert', async (req, res) => {
+// POST /api/events/records/:id/convert - mark as converted
+router.post('/records/:id/convert', async (req, res) => {
   try {
-    const record = await Intec.findByIdAndUpdate(
+    const record = await EventRecord.findByIdAndUpdate(
       req.params.id,
       { 
         isConverted: true,
@@ -355,7 +434,7 @@ router.post('/:id/convert', async (req, res) => {
 
     // Log Activity: Conversion
     await Activity.create({
-      intec: record._id,
+      eventRecord: record._id,
       type: 'Conversion',
       content: `Record marked as Converted by ${req.user.name}`,
       performedBy: req.user._id
@@ -367,8 +446,8 @@ router.post('/:id/convert', async (req, res) => {
   }
 });
 
-// POST /api/intec/:id/notes - add note
-router.post('/:id/notes', async (req, res) => {
+// POST /api/events/records/:id/notes - add note
+router.post('/records/:id/notes', async (req, res) => {
   try {
     const { content } = req.body;
     if (!content || !content.trim()) {
@@ -376,7 +455,7 @@ router.post('/:id/notes', async (req, res) => {
     }
 
     const note = await Note.create({
-      intec: req.params.id,
+      eventRecord: req.params.id,
       content: content.trim(),
       author: req.user._id,
       authorName: req.user.name
@@ -384,7 +463,7 @@ router.post('/:id/notes', async (req, res) => {
 
     // Log Activity: Note
     await Activity.create({
-      intec: req.params.id,
+      eventRecord: req.params.id,
       type: 'Note',
       content: `New note added by ${req.user.name}: "${content.substring(0, 50)}${content.length > 50 ? '...' : ''}"`,
       performedBy: req.user._id
@@ -396,10 +475,10 @@ router.post('/:id/notes', async (req, res) => {
   }
 });
 
-// GET /api/intec/:id/notes - get notes
-router.get('/:id/notes', async (req, res) => {
+// GET /api/events/records/:id/notes - get notes
+router.get('/records/:id/notes', async (req, res) => {
   try {
-    const notes = await Note.find({ intec: req.params.id })
+    const notes = await Note.find({ eventRecord: req.params.id })
       .sort({ createdAt: -1 })
       .populate('author', 'name email');
     res.json(notes);
@@ -408,12 +487,12 @@ router.get('/:id/notes', async (req, res) => {
   }
 });
 
-// POST /api/intec/:id/date - set callback/followup/installation date
-router.post('/:id/date', async (req, res) => {
+// POST /api/events/records/:id/date - set callback/followup/installation date
+router.post('/records/:id/date', async (req, res) => {
   try {
     const { callbackDate, followUpDate, installationDate, note } = req.body;
     
-    const record = await Intec.findById(req.params.id);
+    const record = await EventRecord.findById(req.params.id);
     if (!record) return res.status(404).json({ message: 'Record not found' });
 
     if (callbackDate !== undefined) {
@@ -443,7 +522,7 @@ router.post('/:id/date', async (req, res) => {
     const dateType = callbackDate ? 'Callback' : followUpDate ? 'Follow-up' : 'Installation';
     const noteText = note ? ` (Note: ${note})` : '';
     await Activity.create({
-      intec: record._id,
+      eventRecord: record._id,
       type: 'DateUpdate',
       content: `${dateType} date set to ${formatDate(dateVal)} by ${req.user.name}${noteText}`,
       performedBy: req.user._id
@@ -456,10 +535,10 @@ router.post('/:id/date', async (req, res) => {
   }
 });
 
-// GET /api/intec/:id/activities - get timeline
-router.get('/:id/activities', async (req, res) => {
+// GET /api/events/records/:id/activities - get timeline
+router.get('/records/:id/activities', async (req, res) => {
   try {
-    const activities = await Activity.find({ intec: req.params.id })
+    const activities = await Activity.find({ eventRecord: req.params.id })
       .sort({ createdAt: -1 })
       .populate('performedBy', 'name email');
     res.json(activities);
@@ -468,11 +547,11 @@ router.get('/:id/activities', async (req, res) => {
   }
 });
 
-// POST /api/intec/:id/whatsapp-log - Log WhatsApp
-router.post('/:id/whatsapp-log', async (req, res) => {
+// POST /api/events/records/:id/whatsapp-log - Log WhatsApp
+router.post('/records/:id/whatsapp-log', async (req, res) => {
   try {
     await Activity.create({
-      intec: req.params.id,
+      eventRecord: req.params.id,
       type: 'WhatsApp',
       content: `WhatsApp outreach initiated by ${req.user.name}`,
       performedBy: req.user._id
@@ -483,11 +562,11 @@ router.post('/:id/whatsapp-log', async (req, res) => {
   }
 });
 
-// POST /api/intec/:id/email-log - Log Email
-router.post('/:id/email-log', async (req, res) => {
+// POST /api/events/records/:id/email-log - Log Email
+router.post('/records/:id/email-log', async (req, res) => {
   try {
     await Activity.create({
-      intec: req.params.id,
+      eventRecord: req.params.id,
       type: 'Email',
       content: `Email outreach initiated by ${req.user.name}`,
       performedBy: req.user._id

@@ -17,7 +17,8 @@ const tssRecordSchema = new mongoose.Schema({
     content: String,
     authorName: String,
     createdAt: { type: Date, default: Date.now }
-  }]
+  }],
+  assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
 module.exports = mongoose.model('TssRecord', tssRecordSchema);

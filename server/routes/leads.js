@@ -137,6 +137,22 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/leads/:id - get a single lead
+router.get('/:id', async (req, res) => {
+  try {
+    const lead = await Lead.findById(req.params.id)
+      .populate('assignedTo', 'name email')
+      .populate('createdBy', 'name email');
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
+    }
+    res.json(lead);
+  } catch (err) {
+    console.error('Get lead error:', err);
+    res.status(500).json({ message: 'Server error fetching lead' });
+  }
+});
+
 // POST /api/leads - create lead
 router.post('/', async (req, res) => {
   try {

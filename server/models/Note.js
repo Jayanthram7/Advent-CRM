@@ -13,6 +13,10 @@ const noteSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Intec'
   },
+  eventRecord: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EventRecord'
+  },
   content: {
     type: String,
     required: true,

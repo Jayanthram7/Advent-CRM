@@ -96,6 +96,8 @@ router.get('/datasets/:id/records', async (req, res) => {
           { followUpDate: { $exists: true, $ne: null } },
           { renewalDate: { $exists: true, $ne: null } }
         ];
+      } else if (view === 'review') {
+        query.labels = 'Review';
       } else if (view === 'today') {
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
@@ -124,7 +126,8 @@ router.get('/datasets/:id/records', async (req, res) => {
     const records = await TssRecord.find(query)
       .sort({ _id: 1 })
       .skip(startIndex)
-      .limit(limit);
+      .limit(limit)
+      .populate('assignedTo', 'name email role');
 
     res.json({
       records,
@@ -154,7 +157,7 @@ router.get('/records/today', async (req, res) => {
       status: { $ne: 'Closed' }
     };
 
-    const records = await TssRecord.find(query).sort({ _id: 1 });
+    const records = await TssRecord.find(query).sort({ _id: 1 }).populate('assignedTo', 'name email role');
     res.json({ records });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -197,6 +200,49 @@ router.post('/records/:id/notes', async (req, res) => {
     await record.save();
     res.json(record.notes);
   } catch (err) { res.status(500).json({ message: 'Server error' }); }
+});
+
+// GET /api/tss/records/:id - Get a single TSS record
+router.get('/records/:id', async (req, res) => {
+  try {
+    const record = await TssRecord.findById(req.params.id)
+      .populate('datasetId', 'name')
+      .populate('assignedTo', 'name email role');
+    if (!record) {
+      return res.status(404).json({ message: 'Record not found' });
+    }
+    res.json(record);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /api/tss/records/:id - generic update (e.g. assignment or edit fields)
+router.put('/records/:id', async (req, res) => {
+  try {
+    const { assignedTo, customerName, serialNumber, flavour, mobileNumber, releaseVersion } = req.body;
+    const update = {};
+    if (assignedTo !== undefined) update.assignedTo = assignedTo || null;
+    if (customerName !== undefined) update.customerName = customerName;
+    if (serialNumber !== undefined) update.serialNumber = serialNumber;
+    if (flavour !== undefined) update.flavour = flavour;
+    if (mobileNumber !== undefined) update.mobileNumber = mobileNumber;
+    if (releaseVersion !== undefined) update.releaseVersion = releaseVersion;
+    
+    const record = await TssRecord.findByIdAndUpdate(
+      req.params.id,
+      update,
+      { new: true }
+    ).populate('assignedTo', 'name email role');
+
+    if (!record) {
+      return res.status(404).json({ message: 'Record not found' });
+    }
+    res.json(record);
+  } catch (err) {
+    console.error('Error updating TSS record:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // DELETE /api/tss/records/:id

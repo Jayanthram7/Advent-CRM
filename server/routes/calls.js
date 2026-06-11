@@ -136,6 +136,22 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/calls/:id - get a single call
+router.get('/:id', async (req, res) => {
+  try {
+    const call = await Call.findById(req.params.id)
+      .populate('assignedTo', 'name email')
+      .populate('createdBy', 'name email');
+    if (!call) {
+      return res.status(404).json({ message: 'Call not found' });
+    }
+    res.json(call);
+  } catch (err) {
+    console.error('Get call error:', err);
+    res.status(500).json({ message: 'Server error fetching call' });
+  }
+});
+
 // POST /api/calls - create call
 router.post('/', async (req, res) => {
   try {

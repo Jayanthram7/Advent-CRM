@@ -265,17 +265,7 @@ export default function LoginPage() {
             )}
 
 
-            <div style={{ marginTop: 24, padding: '14px 16px', background: '#f0f5ff', borderRadius: 10, border: '1px solid #dbeafe' }}>
-              <p style={{ fontSize: 12, color: '#3b82f6', fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <BarChart2 size={12} /> Demo Credentials
-              </p>
-              <p style={{ fontSize: 12, color: '#6b7280' }}>
-                Email: <code style={{ background: '#e0ecff', padding: '1px 4px', borderRadius: 3 }}>jayanthramnithin@gmail.com</code>
-              </p>
-              <p style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                Password: <code style={{ background: '#e0ecff', padding: '1px 4px', borderRadius: 3 }}>181104</code>
-              </p>
-            </div>
+
           </div>
         </div>
       </div>

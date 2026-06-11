@@ -1,0 +1,5 @@
+Hall Number,Stall Number,Company Name,Contact Person,Position,Email,Mobile 1,Mobile 2,Address,Country,State,Pincode,Website
+1,A-101,Acme Corp,John Doe,CEO,john@acme.com,9876543210,,123 Main St,India,Tamil Nadu,600001,acme.com
+2,,Beta Industries,Jane Smith,Manager,jane@beta.com,9876543211,9876543212,456 Oak Rd,India,Karnataka,560001,beta.com
+,B-202,Delta Ltd,Bob Johnson,Sales,bob@delta.com,9876543212,,789 Pine Ave,India,Maharashtra,400001,delta.com
+,,Omega LLC,,Director,,,9876543213,321 Elm St,India,Delhi,110001,omega.com

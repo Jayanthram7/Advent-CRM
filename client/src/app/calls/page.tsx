@@ -10,7 +10,7 @@ import {
   ChevronUp, ChevronDown, MoreVertical, Tag, Calendar,
   CheckCircle, FileText, Trash2, X, Phone, Mail,
   MapPin, Building2, Hash, Globe, User, Clock, StickyNote, MessageCircle,
-  AlertCircle
+  AlertCircle, Edit
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -29,7 +29,7 @@ const LABEL_CLASSES: Record<string, string> = {
   'Review': 'badge badge-review',
 };
 
-interface Call {
+export interface Call {
   _id: string;
   firstName: string;
   lastName: string;
@@ -88,7 +88,10 @@ function getInitials(first: string, last: string) {
 }
 
 // ─── Call Detail Drawer ───────────────────────────────────────────────────────
-function CallDrawer({ call, defaultTab = 'details', onClose, onRefresh }: { call: Call; defaultTab?: 'details' | 'notes' | 'log'; onClose: () => void; onRefresh: (updatedCall?: Call) => void }) {
+export function CallDrawer({ call, defaultTab = 'details', onClose, onRefresh }: { call: Call; defaultTab?: 'details' | 'notes' | 'log'; onClose: () => void; onRefresh: (updatedCall?: Call) => void }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+  const [showEdit, setShowEdit] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [newNote, setNewNote] = useState('');
@@ -306,18 +309,50 @@ function CallDrawer({ call, defaultTab = 'details', onClose, onRefresh }: { call
           </div>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', gap: 0, marginBottom: -1 }}>
-            {(['details', 'notes', 'log'] as const).map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} style={{
-                padding: '10px 18px', fontSize: 13.5, fontWeight: activeTab === tab ? 600 : 400,
-                border: 'none', background: 'none', cursor: 'pointer',
-                color: activeTab === tab ? '#1a73e8' : '#6b7280',
-                borderBottom: activeTab === tab ? '2px solid #1a73e8' : '2px solid transparent',
-                transition: 'all 0.15s', textTransform: 'capitalize'
-              }}>
-                {tab === 'notes' ? `Notes (${notes.length})` : tab === 'log' ? 'Edit Log' : 'Details'}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: -1 }}>
+            <div style={{ display: 'flex', gap: 0 }}>
+              {(['details', 'notes', 'log'] as const).map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab)} style={{
+                  padding: '10px 18px', fontSize: 13.5, fontWeight: activeTab === tab ? 600 : 400,
+                  border: 'none', background: 'none', cursor: 'pointer',
+                  color: activeTab === tab ? '#1a73e8' : '#6b7280',
+                  borderBottom: activeTab === tab ? '2px solid #1a73e8' : '2px solid transparent',
+                  transition: 'all 0.15s', textTransform: 'capitalize'
+                }}>
+                  {tab === 'notes' ? `Notes (${notes.length})` : tab === 'log' ? 'Edit Log' : 'Details'}
+                </button>
+              ))}
+            </div>
+            {isAdmin && (
+              <button
+                onClick={() => setShowEdit(true)}
+                title="Edit Call Details"
+                style={{
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: 8,
+                  padding: '6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  marginBottom: 6
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.background = '#dbeafe';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.background = '#eff6ff';
+                }}
+              >
+                <Edit size={14} />
+                Edit Entry
               </button>
-            ))}
+            )}
           </div>
 
         </div>
@@ -743,7 +778,127 @@ function CallDrawer({ call, defaultTab = 'details', onClose, onRefresh }: { call
           )}
         </div>
       </div>
+      {showEdit && (
+        <EditCallModal
+          call={call}
+          onClose={() => setShowEdit(false)}
+          onUpdated={(updated) => {
+            onRefresh(updated);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+// ─── Edit Call Modal ─────────────────────────────────────────────────────────
+function EditCallModal({ call, onClose, onUpdated }: { call: Call; onClose: () => void; onUpdated: (updatedCall: Call) => void }) {
+  const [form, setForm] = useState({
+    firstName: call.firstName || '',
+    lastName: call.lastName || '',
+    email: call.email || '',
+    phone: call.phone || '',
+    secondaryPhone: call.secondaryPhone || '',
+    company: call.company || '',
+    licenseNumber: call.licenseNumber || '',
+    leadSource: call.leadSource || 'Other',
+    address: call.address || '',
+    reason: call.reason || ''
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.firstName || !form.lastName) {
+      toast.error('First and last name are required');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await api.put(`/calls/${call._id}`, form);
+      toast.success('Call updated successfully!');
+      onUpdated(res.data);
+      onClose();
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      toast.error(error?.response?.data?.message || 'Failed to update call');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  return (
+    <div className="modal-overlay" style={{ zIndex: 200 }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 680 }}>
+        <div className="modal-header">
+          <h2 className="modal-title">Edit Call Details</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="form-group">
+                <label className="form-label">First Name *</label>
+                <input className="form-input" value={form.firstName} onChange={e => set('firstName', e.target.value)} placeholder="John" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Last Name *</label>
+                <input className="form-input" value={form.lastName} onChange={e => set('lastName', e.target.value)} placeholder="Doe" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Phone Number</label>
+                <input className="form-input" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+1 555 000 0000" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Secondary Phone</label>
+                <input className="form-input" value={form.secondaryPhone} onChange={e => set('secondaryPhone', e.target.value)} placeholder="+1 555 000 0001" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input className="form-input" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="john@example.com" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Company</label>
+                <input className="form-input" value={form.company} onChange={e => set('company', e.target.value)} placeholder="Acme Inc." />
+              </div>
+              <div className="form-group">
+                <label className="form-label">License Number</label>
+                <input className="form-input" value={form.licenseNumber} onChange={e => set('licenseNumber', e.target.value)} placeholder="LIC-12345" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Lead Source</label>
+                <select className="form-select" value={form.leadSource} onChange={e => set('leadSource', e.target.value)}>
+                  {SOURCE_OPTIONS.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">Address</label>
+                <input className="form-input" value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, Country" />
+              </div>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">Reason</label>
+                <textarea
+                  className="form-input"
+                  value={form.reason}
+                  onChange={e => set('reason', e.target.value)}
+                  placeholder="Reason for enquiry..."
+                  rows={2}
+                  style={{ resize: 'none' }}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? <><div className="spinner" style={{ width: 16, height: 16 }} /> Saving...</> : <><Edit size={15} />Save Changes</>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -1009,7 +1164,7 @@ function RowMenu({ call, onRefresh, users }: { call: Call; onRefresh: () => void
               ) : (
                 <div className="dropdown-item" onClick={askReview}><User size={14} />Ask Review</div>
               )}
-              {!call.isConverted && (
+              {!call.isConverted && isAdmin && (
                 <div className="dropdown-item" onClick={convertCall}><CheckCircle size={14} />Mark as Converted</div>
               )}
               <div className="dropdown-item" onClick={() => { setSubmenu('note'); setOpen(false); setNoteOpen(true); }}><FileText size={14} />Add Note</div>
@@ -1119,15 +1274,17 @@ function CallsPageContent() {
   const { isAdmin, sidebarCollapsed } = useAuth();
   const searchParams = useSearchParams();
   const urlView = searchParams.get('view'); // open | followup | dateset | installation | completed
+  const [viewFilter, setViewFilter] = useState(urlView || '');
 
   const VIEW_TITLES: Record<string, string> = {
     open: 'Open Calls',
     followup: 'Follow Up Calls',
     dateset: 'Date Set Calls',
     installation: 'Installation Calls',
-    completed: 'Completed Calls',
+    completed: 'Closed Calls',
   };
-  const pageTitle = urlView ? (VIEW_TITLES[urlView] || 'Calls') : 'All Calls';
+  const activeView = viewFilter || urlView || '';
+  const pageTitle = activeView ? (VIEW_TITLES[activeView] || 'Calls') : 'All Calls';
 
   const [calls, setCalls] = useState<Call[]>([]);
   const [total, setTotal] = useState(0);
@@ -1155,7 +1312,11 @@ function CallsPageContent() {
 
 
   // Reset page when view changes
-  useEffect(() => { setPage(1); setSearch(''); }, [urlView]);
+  useEffect(() => {
+    setViewFilter(urlView || '');
+    setPage(1);
+    setSearch('');
+  }, [urlView]);
 
   const fetchCalls = useCallback(async () => {
     setLoading(true);
@@ -1168,11 +1329,12 @@ function CallsPageContent() {
       if (endDate) params.endDate = endDate;
 
       // Apply view-based filters
-      if (urlView === 'open')         { params.label = 'Open'; }
-      if (urlView === 'followup')     { params.label = 'Follow Up'; }
-      if (urlView === 'dateset')      { params.dateSet = 'true'; }
-      if (urlView === 'installation') { params.installation = 'true'; }
-      if (urlView === 'completed')    { params.converted = 'true'; }
+      const activeView = viewFilter || urlView;
+      if (activeView === 'open')         { params.label = 'Open'; }
+      if (activeView === 'followup')     { params.label = 'Follow Up'; }
+      if (activeView === 'dateset')      { params.dateSet = 'true'; }
+      if (activeView === 'installation') { params.installation = 'true'; }
+      if (activeView === 'completed')    { params.converted = 'true'; }
 
       const res = await api.get('/calls', { params });
       setCalls(res.data.calls);
@@ -1183,7 +1345,7 @@ function CallsPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, sortBy, sortOrder, filterSource, filterLabel, urlView, startDate, endDate]);
+  }, [page, search, sortBy, sortOrder, filterSource, filterLabel, urlView, viewFilter, startDate, endDate]);
 
   useEffect(() => { fetchCalls(); }, [fetchCalls]);
 
@@ -1274,6 +1436,32 @@ function CallsPageContent() {
             <div style={{ position: 'relative' }}>
               <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
               <input className="search-bar" placeholder="Search calls..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+            </div>
+
+            {/* View Filters */}
+            <div style={{ display: 'flex', background: 'white', borderRadius: 8, padding: 4, border: '1px solid #e2e8f0', height: 38, alignItems: 'center' }}>
+              {[
+                { id: '', label: 'All' },
+                { id: 'open', label: 'Open' },
+                { id: 'followup', label: 'Follow Up' },
+                { id: 'dateset', label: 'Date Set' },
+                { id: 'installation', label: 'Installation' },
+                { id: 'completed', label: 'Closed' }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => { setViewFilter(f.id); setPage(1); }}
+                  style={{
+                    padding: '6px 12px', fontSize: 13, fontWeight: (viewFilter || urlView || '') === f.id ? 600 : 500,
+                    color: (viewFilter || urlView || '') === f.id ? '#0284c7' : '#64748b',
+                    background: (viewFilter || urlView || '') === f.id ? '#e0f2fe' : 'transparent',
+                    border: 'none', borderRadius: 6, cursor: 'pointer', transition: 'all 0.15s',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

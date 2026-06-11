@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback, Suspense, use } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import TopBar from '@/components/TopBar';
 import api from '@/lib/api';
@@ -10,7 +10,7 @@ import {
   ChevronUp, ChevronDown, MoreVertical, Tag, Calendar,
   CheckCircle, FileText, Trash2, X, Phone, Mail,
   MapPin, Building2, Hash, Globe, User, Clock, StickyNote, MessageCircle,
-  AlertCircle, Upload, Download
+  AlertCircle, Upload, Download, Edit
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -28,8 +28,9 @@ const LABEL_CLASSES: Record<string, string> = {
   'Review': 'badge badge-review',
 };
 
-interface IntecRecord {
+export interface EventRecord {
   _id: string;
+  datasetId: string;
   hallNumber: string;
   stallNumber: string;
   companyName: string;
@@ -81,7 +82,7 @@ interface Activity {
 }
 
 function getInitials(name: string) {
-  if (!name) return 'IN';
+  if (!name) return 'EV';
   const parts = name.trim().split(' ');
   if (parts.length >= 2) {
     return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
@@ -89,8 +90,11 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
-// ─── Intec Detail Drawer ──────────────────────────────────────────────────────
-function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { record: IntecRecord; defaultTab?: 'details' | 'notes' | 'log'; onClose: () => void; onRefresh: (updatedRecord?: IntecRecord) => void }) {
+// ─── Event Detail Drawer ──────────────────────────────────────────────────────
+export function EventDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { record: EventRecord; defaultTab?: 'details' | 'notes' | 'log'; onClose: () => void; onRefresh: (updatedRecord?: EventRecord) => void }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+  const [showEdit, setShowEdit] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [newNote, setNewNote] = useState('');
@@ -121,15 +125,21 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
     setIsUpdatingFollowUp(false);
   }, [record]);
 
+  useEffect(() => {
+    if (activeTab === 'log' && user && user.role !== 'Admin') {
+      setActiveTab('details');
+    }
+  }, [activeTab, user]);
+
   const fetchNotes = useCallback(() => {
-    api.get(`/intec/${record._id}/notes`).then(r => setNotes(r.data)).catch(() => {});
+    api.get(`/events/records/${record._id}/notes`).then(r => setNotes(r.data)).catch(() => { });
   }, [record._id]);
 
   const fetchActivities = useCallback(() => {
     setActivitiesLoading(true);
-    api.get(`/intec/${record._id}/activities`)
+    api.get(`/events/records/${record._id}/activities`)
       .then(r => setActivities(r.data))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setActivitiesLoading(false));
   }, [record._id]);
 
@@ -142,7 +152,7 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
     if (!newNote.trim()) return;
     setNotesLoading(true);
     try {
-      await api.post(`/intec/${record._id}/notes`, { content: newNote });
+      await api.post(`/events/records/${record._id}/notes`, { content: newNote });
       fetchNotes();
       fetchActivities();
       setNewNote('');
@@ -161,13 +171,13 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
       return;
     }
     const cleanPhone = mobile.replace(/\D/g, '');
-    const message = encodeURIComponent(`Hi ${record.contactPerson}, this is from Advent Systems regarding our discussion at Intec...`);
+    const message = encodeURIComponent(`Hi ${record.contactPerson}, this is from Advent Systems regarding our discussion...`);
     const waUrl = `https://wa.me/${cleanPhone}?text=${message}`;
-    
-    api.post(`/intec/${record._id}/whatsapp-log`).then(() => {
+
+    api.post(`/events/records/${record._id}/whatsapp-log`).then(() => {
       fetchActivities();
       onRefresh();
-    }).catch(() => {});
+    }).catch(() => { });
 
     window.open(waUrl, '_blank');
   };
@@ -177,14 +187,14 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
       toast.error('No email address available');
       return;
     }
-    const subject = encodeURIComponent('Inquiry from Advent Systems - Intec');
-    const body = encodeURIComponent(`Hi ${record.contactPerson},\n\nIt was nice meeting you at Intec. This is regarding our discussion...`);
+    const subject = encodeURIComponent('Inquiry from Advent Systems');
+    const body = encodeURIComponent(`Hi ${record.contactPerson},\n\nIt was nice meeting you. This is regarding our discussion...`);
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${record.email}&su=${subject}&body=${body}`;
-    
-    api.post(`/intec/${record._id}/email-log`).then(() => {
+
+    api.post(`/events/records/${record._id}/email-log`).then(() => {
       fetchActivities();
       onRefresh();
-    }).catch(() => {});
+    }).catch(() => { });
 
     window.open(gmailUrl, '_blank');
   };
@@ -240,14 +250,14 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {(record.mobile1 || record.mobile2) && (
-                <button 
+                <button
                   onClick={handleWhatsApp}
                   title="Contact via WhatsApp"
-                  style={{ 
-                    background: '#25D366', 
-                    color: 'white', 
-                    border: 'none', 
-                    borderRadius: 8, 
+                  style={{
+                    background: '#25D366',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 8,
                     padding: '8px 12px',
                     display: 'flex',
                     alignItems: 'center',
@@ -266,14 +276,14 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
                 </button>
               )}
               {record.email && (
-                <button 
+                <button
                   onClick={handleEmail}
                   title="Contact via Email"
-                  style={{ 
-                    background: '#EBF5FF', 
-                    color: '#0070F3', 
-                    border: '1px solid #D1E9FF', 
-                    borderRadius: 8, 
+                  style={{
+                    background: '#EBF5FF',
+                    color: '#0070F3',
+                    border: '1px solid #D1E9FF',
+                    borderRadius: 8,
                     padding: '8px 12px',
                     display: 'flex',
                     alignItems: 'center',
@@ -297,18 +307,50 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
           </div>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', gap: 0, marginBottom: -1 }}>
-            {(['details', 'notes', 'log'] as const).map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} style={{
-                padding: '10px 18px', fontSize: 13.5, fontWeight: activeTab === tab ? 600 : 400,
-                border: 'none', background: 'none', cursor: 'pointer',
-                color: activeTab === tab ? '#1a73e8' : '#6b7280',
-                borderBottom: activeTab === tab ? '2px solid #1a73e8' : '2px solid transparent',
-                transition: 'all 0.15s', textTransform: 'capitalize'
-              }}>
-                {tab === 'notes' ? `Notes (${notes.length})` : tab === 'log' ? 'Edit Log' : 'Details'}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: -1 }}>
+            <div style={{ display: 'flex', gap: 0 }}>
+              {(['details', 'notes', 'log'] as const).filter(t => t !== 'log' || isAdmin).map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab)} style={{
+                  padding: '10px 18px', fontSize: 13.5, fontWeight: activeTab === tab ? 600 : 400,
+                  border: 'none', background: 'none', cursor: 'pointer',
+                  color: activeTab === tab ? '#1a73e8' : '#6b7280',
+                  borderBottom: activeTab === tab ? '2px solid #1a73e8' : '2px solid transparent',
+                  transition: 'all 0.15s', textTransform: 'capitalize'
+                }}>
+                  {tab === 'notes' ? `Notes (${notes.length})` : tab === 'log' ? 'Edit Log' : 'Details'}
+                </button>
+              ))}
+            </div>
+            {isAdmin && (
+              <button
+                onClick={() => setShowEdit(true)}
+                title="Edit Details"
+                style={{
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: 8,
+                  padding: '6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  marginBottom: 6
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.background = '#dbeafe';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.background = '#eff6ff';
+                }}
+              >
+                <Edit size={14} />
+                Edit Entry
               </button>
-            ))}
+            )}
           </div>
         </div>
 
@@ -346,8 +388,8 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
                   </div>
 
                   {isUpdatingCallback && (
-                    <div style={{ 
-                      background: 'rgba(255, 255, 255, 0.6)', 
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.6)',
                       borderRadius: 8, padding: 12, border: '1px dashed #bfdbfe',
                       display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4
                     }}>
@@ -378,7 +420,7 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
                           }
                           setUpdatingCallbackLoading(true);
                           try {
-                            const res = await api.post(`/intec/${record._id}/date`, {
+                            const res = await api.post(`/events/records/${record._id}/date`, {
                               callbackDate: newCallbackDate,
                               note: callbackNote
                             });
@@ -453,8 +495,8 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
                   </div>
 
                   {isUpdatingFollowUp && (
-                    <div style={{ 
-                      background: 'rgba(255, 255, 255, 0.6)', 
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.6)',
                       borderRadius: 8, padding: 12, border: '1px dashed #fde68a',
                       display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4
                     }}>
@@ -485,7 +527,7 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
                           }
                           setUpdatingFollowUpLoading(true);
                           try {
-                            const res = await api.post(`/intec/${record._id}/date`, {
+                            const res = await api.post(`/events/records/${record._id}/date`, {
                               followUpDate: newFollowUpDate,
                               note: followUpNote
                             });
@@ -633,7 +675,7 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
             </div>
           )}
 
-          {activeTab === 'log' && (
+          {activeTab === 'log' && isAdmin && (
             <div style={{ paddingTop: 20 }}>
               {activitiesLoading ? (
                 <div style={{ textAlign: 'center', padding: '40px 0' }}><div className="spinner spinner-dark" style={{ width: 24, height: 24, margin: '0 auto' }} /></div>
@@ -644,11 +686,11 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0, position: 'relative' }}>
                   <div style={{ position: 'absolute', left: 7, top: 10, bottom: 10, width: 2, background: '#f0f2f7', zIndex: 0 }} />
-                  
+
                   {activities.map((act) => (
                     <div key={act._id} style={{ display: 'flex', gap: 16, marginBottom: 24, position: 'relative', zIndex: 1 }}>
-                      <div style={{ 
-                        width: 16, height: 16, borderRadius: '50%', 
+                      <div style={{
+                        width: 16, height: 16, borderRadius: '50%',
                         background: act.type === 'Creation' ? '#10b981' : act.type === 'Conversion' ? '#8b5cf6' : act.type === 'WhatsApp' ? '#25D366' : act.type === 'Email' ? '#0070F3' : act.type === 'DateUpdate' ? '#f59e0b' : '#e2e8f0',
                         border: '4px solid white', boxShadow: '0 0 0 1px #f0f2f7', flexShrink: 0, marginTop: 4
                       }} />
@@ -670,12 +712,137 @@ function IntecDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { r
           )}
         </div>
       </div>
+      {showEdit && (
+        <EditEventRecordModal
+          record={record}
+          onClose={() => setShowEdit(false)}
+          onUpdated={(updated) => {
+            onRefresh(updated);
+          }}
+        />
+      )}
     </>
   );
 }
 
-// ─── Create Intec Modal ──────────────────────────────────────────────────────
-function CreateIntecModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+// ─── Edit Event Record Modal ──────────────────────────────────────────────────
+function EditEventRecordModal({ record, onClose, onUpdated }: { record: EventRecord; onClose: () => void; onUpdated: (updatedRecord: EventRecord) => void }) {
+  const [form, setForm] = useState({
+    hallNumber: record.hallNumber || '',
+    stallNumber: record.stallNumber || '',
+    companyName: record.companyName || '',
+    contactPerson: record.contactPerson || '',
+    position: record.position || '',
+    email: record.email || '',
+    mobile1: record.mobile1 || '',
+    mobile2: record.mobile2 || '',
+    address: record.address || '',
+    country: record.country || '',
+    state: record.state || '',
+    pincode: record.pincode || '',
+    website: record.website || ''
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.companyName || !form.contactPerson) {
+      toast.error('Company Name and Contact Person are required');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await api.put(`/events/records/${record._id}`, form);
+      toast.success('Record updated successfully!');
+      onUpdated(res.data);
+      onClose();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update record');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  return (
+    <div className="modal-overlay" style={{ zIndex: 200 }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 680 }}>
+        <div className="modal-header">
+          <h2 className="modal-title">Edit Record Details</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="form-group">
+                <label className="form-label">Hall Number</label>
+                <input className="form-input" value={form.hallNumber} onChange={e => set('hallNumber', e.target.value)} placeholder="Hall 1" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Stall Number</label>
+                <input className="form-input" value={form.stallNumber} onChange={e => set('stallNumber', e.target.value)} placeholder="105" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Company Name *</label>
+                <input className="form-input" value={form.companyName} onChange={e => set('companyName', e.target.value)} placeholder="Acme Corp" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Contact Person *</label>
+                <input className="form-input" value={form.contactPerson} onChange={e => set('contactPerson', e.target.value)} placeholder="John Doe" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Position</label>
+                <input className="form-input" value={form.position} onChange={e => set('position', e.target.value)} placeholder="Manager" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input className="form-input" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="john@example.com" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Mobile 1</label>
+                <input className="form-input" value={form.mobile1} onChange={e => set('mobile1', e.target.value)} placeholder="+91 99999 99999" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Mobile 2</label>
+                <input className="form-input" value={form.mobile2} onChange={e => set('mobile2', e.target.value)} placeholder="+91 88888 88888" />
+              </div>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">Address</label>
+                <input className="form-input" value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main Rd" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Country</label>
+                <input className="form-input" value={form.country} onChange={e => set('country', e.target.value)} placeholder="India" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">State</label>
+                <input className="form-input" value={form.state} onChange={e => set('state', e.target.value)} placeholder="Tamil Nadu" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Pincode</label>
+                <input className="form-input" value={form.pincode} onChange={e => set('pincode', e.target.value)} placeholder="641001" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Website</label>
+                <input className="form-input" value={form.website} onChange={e => set('website', e.target.value)} placeholder="www.example.com" />
+              </div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? <><div className="spinner" style={{ width: 16, height: 16 }} /> Saving...</> : <><Edit size={15} />Save Changes</>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Create Event Record Modal ────────────────────────────────────────────────
+function CreateEventRecordModal({ datasetId, onClose, onCreated }: { datasetId: string; onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState({
     hallNumber: '', stallNumber: '', companyName: '', contactPerson: '',
     position: '', email: '', mobile1: '', mobile2: '',
@@ -691,8 +858,8 @@ function CreateIntecModal({ onClose, onCreated }: { onClose: () => void; onCreat
     }
     setLoading(true);
     try {
-      await api.post('/intec', form);
-      toast.success('Intec record created successfully!');
+      await api.post('/events/records', { ...form, datasetId });
+      toast.success('Record created successfully!');
       onCreated();
       onClose();
     } catch (err: any) {
@@ -708,7 +875,7 @@ function CreateIntecModal({ onClose, onCreated }: { onClose: () => void; onCreat
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ maxWidth: 680 }}>
         <div className="modal-header">
-          <h2 className="modal-title">Create New Intec Record</h2>
+          <h2 className="modal-title">Create New Event Record</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -781,7 +948,7 @@ function CreateIntecModal({ onClose, onCreated }: { onClose: () => void; onCreat
 }
 
 // ─── Row Actions Menu ────────────────────────────────────────────────────────
-function RowMenu({ record, onRefresh, users }: { record: IntecRecord; onRefresh: () => void; users: any[] }) {
+function RowMenu({ record, onRefresh, users }: { record: EventRecord; onRefresh: () => void; users: any[] }) {
   const { isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [submenu, setSubmenu] = useState<'labels' | 'date_followup' | 'date_install' | 'assign' | null>(null);
@@ -798,8 +965,8 @@ function RowMenu({ record, onRefresh, users }: { record: IntecRecord; onRefresh:
       return;
     }
     try {
-      await api.put(`/intec/${record._id}`, { assignedTo: adminUser._id });
-      await api.post(`/intec/${record._id}/labels`, { labels: ['Review'] });
+      await api.put(`/events/records/${record._id}`, { assignedTo: adminUser._id });
+      await api.post(`/events/records/${record._id}/labels`, { labels: ['Review'] });
       toast.success('Record assigned to Admin for review');
       onRefresh();
       setOpen(false);
@@ -816,7 +983,7 @@ function RowMenu({ record, onRefresh, users }: { record: IntecRecord; onRefresh:
 
   const saveLabels = async () => {
     try {
-      await api.post(`/intec/${record._id}/labels`, { labels: selectedLabels });
+      await api.post(`/events/records/${record._id}/labels`, { labels: selectedLabels });
       toast.success('Labels updated');
       onRefresh();
       setOpen(false);
@@ -825,7 +992,7 @@ function RowMenu({ record, onRefresh, users }: { record: IntecRecord; onRefresh:
 
   const saveDate = async (type: 'followUpDate' | 'installationDate') => {
     try {
-      await api.post(`/intec/${record._id}/date`, { [type]: date });
+      await api.post(`/events/records/${record._id}/date`, { [type]: date });
       toast.success('Date set');
       onRefresh();
       setOpen(false);
@@ -834,7 +1001,7 @@ function RowMenu({ record, onRefresh, users }: { record: IntecRecord; onRefresh:
 
   const assignRecord = async (userId: string) => {
     try {
-      await api.put(`/intec/${record._id}`, { assignedTo: userId });
+      await api.put(`/events/records/${record._id}`, { assignedTo: userId });
       toast.success('Record assigned');
       onRefresh();
       setOpen(false);
@@ -843,7 +1010,7 @@ function RowMenu({ record, onRefresh, users }: { record: IntecRecord; onRefresh:
 
   const convertRecord = async () => {
     try {
-      await api.post(`/intec/${record._id}/convert`);
+      await api.post(`/events/records/${record._id}/convert`);
       toast.success('Record marked as converted!');
       onRefresh();
       setOpen(false);
@@ -853,7 +1020,7 @@ function RowMenu({ record, onRefresh, users }: { record: IntecRecord; onRefresh:
   const deleteRecord = async () => {
     if (!confirm('Delete this record? This cannot be undone.')) return;
     try {
-      await api.delete(`/intec/${record._id}`);
+      await api.delete(`/events/records/${record._id}`);
       toast.success('Record deleted');
       onRefresh();
     } catch { toast.error('Failed to delete record'); }
@@ -941,20 +1108,20 @@ function RowMenu({ record, onRefresh, users }: { record: IntecRecord; onRefresh:
                 {users.length === 0 ? (
                   <p style={{ fontSize: 12, color: '#9ca3af', padding: '10px 0' }}>No users found</p>
                 ) : users.map(u => (
-                  <div 
-                    key={u._id} 
-                    className="dropdown-item" 
+                  <div
+                    key={u._id}
+                    className="dropdown-item"
                     onClick={() => assignRecord(u._id)}
-                    style={{ 
-                      fontSize: 13, 
+                    style={{
+                      fontSize: 13,
                       padding: '8px 10px',
                       background: record.assignedTo?._id === u._id ? '#f0f7ff' : 'transparent',
                       color: record.assignedTo?._id === u._id ? '#1a73e8' : 'inherit'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ 
-                        width: 24, height: 24, borderRadius: '50%', background: '#e2e8f0', 
+                      <div style={{
+                        width: 24, height: 24, borderRadius: '50%', background: '#e2e8f0',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700
                       }}>
                         {u.name.split(' ').map((n: string) => n[0]).join('')}
@@ -993,7 +1160,7 @@ function RowMenu({ record, onRefresh, users }: { record: IntecRecord; onRefresh:
                   const val = e.currentTarget.value;
                   if (!val.trim()) return;
                   try {
-                    await api.post(`/intec/${record._id}/notes`, { content: val });
+                    await api.post(`/events/records/${record._id}/notes`, { content: val });
                     toast.success('Note added');
                     setNoteOpen(false);
                     onRefresh();
@@ -1008,22 +1175,15 @@ function RowMenu({ record, onRefresh, users }: { record: IntecRecord; onRefresh:
   );
 }
 
-// ─── Main Intec Page Content ─────────────────────────────────────────────────
-function IntecPageContent() {
-  const { isAdmin, sidebarCollapsed } = useAuth();
+// ─── Main Event Page Content ──────────────────────────────────────────────────
+function EventPageContent({ id }: { id: string }) {
+  const { user, isAdmin } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const urlView = searchParams.get('view'); 
+  const urlView = searchParams.get('view');
 
-  const VIEW_TITLES: Record<string, string> = {
-    open: 'Open Intec Records',
-    followup: 'Follow Up Intec',
-    dateset: 'Date Set Intec',
-    installation: 'Installation Intec',
-    completed: 'Completed Intec',
-  };
-  const pageTitle = urlView ? (VIEW_TITLES[urlView] || 'Intec') : 'All Intec Records';
-
-  const [records, setRecords] = useState<IntecRecord[]>([]);
+  const [datasetName, setDatasetName] = useState('Event Records');
+  const [records, setRecords] = useState<EventRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
   const [page, setPage] = useState(1);
@@ -1035,17 +1195,25 @@ function IntecPageContent() {
   const [sortOrder, setSortOrder] = useState('desc');
   const [filterLabel, setFilterLabel] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [selectedRecord, setSelectedRecord] = useState<IntecRecord | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<EventRecord | null>(null);
   const [drawerTab, setDrawerTab] = useState<'details' | 'notes' | 'log'>('details');
   const [users, setUsers] = useState<any[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [viewFilter, setViewFilter] = useState(urlView || '');
 
   useEffect(() => {
-    api.get('/users').then(r => setUsers(r.data)).catch(() => {});
-  }, []);
+    api.get('/users').then(r => setUsers(r.data)).catch(() => { });
+    api.get(`/events/datasets/${id}`)
+      .then(res => setDatasetName(res.data.name))
+      .catch(() => setDatasetName('Event Records'));
+  }, [id]);
 
-  useEffect(() => { setPage(1); setSearch(''); }, [urlView]);
+  useEffect(() => {
+    setViewFilter(urlView || '');
+    setPage(1);
+    setSearch('');
+  }, [urlView]);
 
   const fetchRecords = useCallback(async () => {
     setLoading(true);
@@ -1056,22 +1224,29 @@ function IntecPageContent() {
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
 
-      if (urlView === 'open')         { params.label = 'Open'; }
-      if (urlView === 'followup')     { params.label = 'Follow Up'; }
-      if (urlView === 'dateset')      { params.dateSet = 'true'; }
-      if (urlView === 'installation') { params.installation = 'true'; }
-      if (urlView === 'completed')    { params.converted = 'true'; }
+      const activeView = viewFilter || urlView;
+      if (activeView === 'open') { params.label = 'Open'; }
+      if (activeView === 'followup') { params.label = 'Follow Up'; }
+      if (activeView === 'dateset') { params.dateSet = 'true'; }
+      if (activeView === 'installation') { params.installation = 'true'; }
+      if (activeView === 'completed') { params.converted = 'true'; }
 
-      const res = await api.get('/intec', { params });
-      setRecords(res.data.intec);
+      const res = await api.get(`/events/datasets/${id}/records`, { params });
+      setRecords(res.data.records);
       setTotal(res.data.total);
       setPages(res.data.pages);
+
+      setSelectedRecord(prev => {
+        if (!prev) return null;
+        const updated = res.data.records.find((r: EventRecord) => r._id === prev._id);
+        return updated || prev;
+      });
     } catch {
-      toast.error('Failed to fetch Intec records');
+      toast.error('Failed to fetch event records');
     } finally {
       setLoading(false);
     }
-  }, [page, search, sortBy, sortOrder, filterLabel, urlView, startDate, endDate]);
+  }, [id, page, search, sortBy, sortOrder, filterLabel, urlView, viewFilter, startDate, endDate]);
 
   useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
@@ -1086,54 +1261,8 @@ function IntecPageContent() {
     </span>
   );
 
-  const toggleSelect = (id: string) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const toggleSelect = (recId: string) => setSelectedIds(prev => prev.includes(recId) ? prev.filter(i => i !== recId) : [...prev, recId]);
   const toggleAll = () => setSelectedIds(prev => prev.length === records.length ? [] : records.map(l => l._id));
-
-  // Client-side Excel parsing & uploading
-  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      toast.loading('Loading XLSX parser...');
-      const XLSX = await import('xlsx');
-      const reader = new FileReader();
-
-      reader.onload = async (evt) => {
-        try {
-          toast.loading('Parsing Excel columns...');
-          const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
-          const rows = XLSX.utils.sheet_to_json(worksheet);
-
-          if (rows.length === 0) {
-            toast.dismiss();
-            toast.error('Excel sheet is empty');
-            return;
-          }
-
-          toast.loading(`Importing ${rows.length} records...`);
-          await api.post('/intec/import', { records: rows });
-          toast.dismiss();
-          toast.success(`Successfully imported Intec records!`);
-          fetchRecords();
-        } catch (err: any) {
-          console.error(err);
-          toast.dismiss();
-          toast.error(err?.response?.data?.message || 'Error importing Excel records');
-        }
-      };
-
-      reader.readAsArrayBuffer(file);
-    } catch (err) {
-      console.error(err);
-      toast.dismiss();
-      toast.error('Failed to parse file');
-    }
-    e.target.value = '';
-  };
 
   // Client-side Excel generation & downloading
   const handleExportExcel = async () => {
@@ -1145,14 +1274,15 @@ function IntecPageContent() {
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
 
-      if (urlView === 'open')         { params.label = 'Open'; }
-      if (urlView === 'followup')     { params.label = 'Follow Up'; }
-      if (urlView === 'dateset')      { params.dateSet = 'true'; }
-      if (urlView === 'installation') { params.installation = 'true'; }
-      if (urlView === 'completed')    { params.converted = 'true'; }
+      const activeView = viewFilter || urlView;
+      if (activeView === 'open') { params.label = 'Open'; }
+      if (activeView === 'followup') { params.label = 'Follow Up'; }
+      if (activeView === 'dateset') { params.dateSet = 'true'; }
+      if (activeView === 'installation') { params.installation = 'true'; }
+      if (activeView === 'completed') { params.converted = 'true'; }
 
-      const res = await api.get('/intec', { params });
-      const exportItems = res.data.intec || [];
+      const res = await api.get(`/events/datasets/${id}/records`, { params });
+      const exportItems = res.data.records || [];
 
       if (exportItems.length === 0) {
         toast.dismiss();
@@ -1186,9 +1316,9 @@ function IntecPageContent() {
 
       const sheet = XLSX.utils.json_to_sheet(formatted);
       const book = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(book, sheet, 'Intec Leads');
+      XLSX.utils.book_append_sheet(book, sheet, 'Event Leads');
 
-      XLSX.writeFile(book, `Intec_Leads_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+      XLSX.writeFile(book, `Event_Leads_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
       toast.dismiss();
       toast.success('Excel file exported successfully!');
     } catch (err) {
@@ -1200,267 +1330,297 @@ function IntecPageContent() {
 
   return (
     <ProtectedLayout>
-      <TopBar title={pageTitle} onRefresh={fetchRecords}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {isAdmin && (
-            <button
-              className={filterLabel === 'Review' ? 'btn-danger' : 'btn-secondary'}
-              onClick={() => {
-                setFilterLabel(prev => prev === 'Review' ? '' : 'Review');
-                setPage(1);
-              }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                ...(filterLabel === 'Review' ? { background: '#fee2e2', color: '#b91c1c', borderColor: '#fca5a5' } : {})
-              }}
-            >
-              <AlertCircle size={14} style={filterLabel === 'Review' ? { color: '#b91c1c' } : {}} />
-              Needs Review
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#f8fafc' }}>
+        <TopBar title={datasetName} onRefresh={fetchRecords}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {isAdmin && (
+              <button
+                className={filterLabel === 'Review' ? 'btn-danger' : 'btn-secondary'}
+                onClick={() => {
+                  setFilterLabel(prev => prev === 'Review' ? '' : 'Review');
+                  setPage(1);
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  ...(filterLabel === 'Review' ? { background: '#fee2e2', color: '#b91c1c', borderColor: '#fca5a5' } : {})
+                }}
+              >
+                <AlertCircle size={14} style={filterLabel === 'Review' ? { color: '#b91c1c' } : {}} />
+                Needs Review
+              </button>
+            )}
+            <button className="btn-secondary" onClick={() => setShowFilter(!showFilter)}><Filter size={14} />Filter</button>
+
+            {user?.role !== 'Agent' && (
+              <button className="btn-secondary" onClick={handleExportExcel} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Download size={14} /> Export Excel
+              </button>
+            )}
+            <button className="btn-primary" onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Plus size={14} /> Add Lead
             </button>
-          )}
-          <button className="btn-secondary" onClick={() => setShowFilter(!showFilter)}><Filter size={14} />Filter</button>
-          
-          <input
-            type="file"
-            id="intec-excel-import"
-            accept=".xlsx,.xls,.csv"
-            onChange={handleImportExcel}
-            style={{ display: 'none' }}
-          />
-          <label htmlFor="intec-excel-import" className="btn-secondary" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Upload size={14} /> Import Excel
-          </label>
+            {isAdmin && (
+              <button
+                onClick={async () => {
+                  if (confirm(`CRITICAL WARNING: Are you sure you want to delete the entire event "${datasetName}"? This will delete the event, all ${total} records, notes, and activity timeline. This action CANNOT BE UNDONE.`)) {
+                    try {
+                      await api.delete(`/events/datasets/${id}`);
+                      toast.success('Event dataset deleted successfully');
+                      router.push('/events');
+                    } catch (err) {
+                      console.error('Failed to delete dataset:', err);
+                      toast.error('Failed to delete event dataset');
+                    }
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '7px 12px',
+                  background: 'white',
+                  color: '#475569',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: 8,
+                  fontSize: 13.5,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.background = '#f1f5f9';
+                  e.currentTarget.style.color = '#0f172a';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.background = 'white';
+                  e.currentTarget.style.color = '#475569';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                }}
+                title="Delete Event"
+              >
+                <Trash2 size={14} />
+                Delete Event
+              </button>
+            )}
+          </div>
+        </TopBar>
 
-          <button className="btn-secondary" onClick={handleExportExcel} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Download size={14} /> Export Excel
-          </button>
-
-          <button className="btn-primary" onClick={() => setShowCreate(true)}><Plus size={15} />Create Record</button>
-        </div>
-      </TopBar>
-
-      <div style={{ display: 'flex', position: 'relative' }}>
+        {/* Filters Panel */}
         {showFilter && (
-          <div className="filter-panel" style={{ left: sidebarCollapsed ? 64 : 240 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <span style={{ fontWeight: 600, fontSize: 14 }}>Filters</span>
-              <button onClick={() => setShowFilter(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={16} /></button>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 14 }}>
-              <label className="form-label">Label</label>
-              <select className="form-select" value={filterLabel} onChange={e => { setFilterLabel(e.target.value); setPage(1); }}>
+          <div style={{ padding: '16px 32px', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', animation: 'slideDown 0.2s ease' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Filter by Label</label>
+              <select value={filterLabel} onChange={e => { setFilterLabel(e.target.value); setPage(1); }} style={{ padding: '8px 10px', fontSize: 13.5, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white', minWidth: 150 }}>
                 <option value="">All Labels</option>
-                {LABEL_OPTIONS.map(l => <option key={l}>{l}</option>)}
+                {LABEL_OPTIONS.map(lbl => <option key={lbl} value={lbl}>{lbl}</option>)}
               </select>
             </div>
-
-            <button className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { setFilterLabel(''); setPage(1); }}>
-              Clear Filters
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Created Start Date</label>
+              <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setPage(1); }} style={{ padding: '7px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white' }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Created End Date</label>
+              <input type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setPage(1); }} style={{ padding: '7px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white' }} />
+            </div>
+            {(filterLabel || startDate || endDate) && (
+              <button
+                onClick={() => { setFilterLabel(''); setStartDate(''); setEndDate(''); setPage(1); }}
+                style={{ padding: '8px 16px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', alignSelf: 'flex-end', height: 38 }}
+              >
+                Clear Filters
+              </button>
+            )}
           </div>
         )}
 
-        <div style={{ flex: 1, padding: 24, marginLeft: showFilter ? 280 : 0, transition: 'margin-left 0.2s' }}>
-          {/* Search bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-              <input className="search-bar" placeholder="Search Intec records..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input 
-                type="date" 
-                value={startDate} 
-                onChange={e => { setStartDate(e.target.value); setPage(1); }} 
-                style={{ padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white', color: '#374151', height: 38 }}
-              />
-              <span style={{ fontSize: 12, color: '#9ca3af' }}>to</span>
-              <input 
-                type="date" 
-                value={endDate} 
-                onChange={e => { setEndDate(e.target.value); setPage(1); }} 
-                style={{ padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white', color: '#374151', height: 38 }}
-              />
-              {(startDate || endDate) && (
-                <button 
-                  onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }} 
-                  style={{ background: '#fee2e2', border: 'none', color: '#b91c1c', padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, height: 38 }}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-
-            <span style={{ fontSize: 13, color: '#6b7280', marginLeft: 'auto' }}>{total} records</span>
-            {selectedIds.length > 0 && (
-              <span style={{ fontSize: 13, color: '#1a73e8', fontWeight: 500 }}>{selectedIds.length} selected</span>
-            )}
+        <div style={{ padding: '24px 32px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: '0 0 4px 0' }}>{datasetName} Records</h1>
+            <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Showing {total} records</p>
           </div>
 
-          {/* Table */}
-          <div className="card" style={{ padding: 0 }}>
-            {loading ? (
-              <div className="empty-state"><div className="spinner spinner-dark" style={{ width: 32, height: 32 }} /><p>Loading records...</p></div>
-            ) : records.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-state-icon"><Search size={28} color="#9ca3af" /></div>
-                <p style={{ fontWeight: 600, color: '#374151' }}>No Intec records found</p>
-                <p style={{ fontSize: 13 }}>Create your first record, import an Excel sheet, or adjust filters</p>
-                <button className="btn-primary" onClick={() => setShowCreate(true)}><Plus size={14} />Create Record</button>
-              </div>
-            ) : (
-              <div>
-                <table className="data-table">
-                  <thead>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            {/* View Filters */}
+            <div style={{ display: 'flex', background: 'white', borderRadius: 8, padding: 4, border: '1px solid #e2e8f0' }}>
+              {[
+                { id: '', label: 'All' },
+                { id: 'open', label: 'Open' },
+                { id: 'followup', label: 'Follow Up' },
+                { id: 'dateset', label: 'Date Set' },
+                { id: 'installation', label: 'Installation' },
+                { id: 'completed', label: 'Completed' }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => { setViewFilter(f.id); setPage(1); }}
+                  style={{
+                    padding: '6px 12px', fontSize: 13, fontWeight: (viewFilter || urlView || '') === f.id ? 600 : 500,
+                    color: (viewFilter || urlView || '') === f.id ? '#0284c7' : '#64748b',
+                    background: (viewFilter || urlView || '') === f.id ? '#e0f2fe' : 'transparent',
+                    border: 'none', borderRadius: 6, cursor: 'pointer', transition: 'all 0.15s'
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input
+                type="text" placeholder="Search..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
+                style={{ padding: '9px 12px 9px 34px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, width: 220, outline: 'none', background: 'white' }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Table Container */}
+        <div style={{ flex: 1, padding: '0 32px 24px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 10, boxShadow: '0 1px 0 #e2e8f0' }}>
+                  <tr>
+                    <th style={{ padding: '12px 16px', width: 40 }}>
+                      <input type="checkbox" checked={records.length > 0 && selectedIds.length === records.length} onChange={toggleAll} style={{ cursor: 'pointer' }} />
+                    </th>
+                    <th onClick={() => toggleSort('hallNumber')} style={{ padding: '12px 12px', fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer' }}>Hall/Stall <SortIcon col="hallNumber" /></th>
+                    <th onClick={() => toggleSort('companyName')} style={{ padding: '12px 12px', fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer', width: '22%' }}>Company / Contact <SortIcon col="companyName" /></th>
+                    <th onClick={() => toggleSort('mobile1')} style={{ padding: '12px 12px', fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer' }}>Mobile <SortIcon col="mobile1" /></th>
+                    <th onClick={() => toggleSort('email')} style={{ padding: '12px 12px', fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer' }}>Email <SortIcon col="email" /></th>
+                    <th style={{ padding: '12px 12px', fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Labels</th>
+                    <th onClick={() => toggleSort('assignedTo')} style={{ padding: '12px 12px', fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer' }}>Assigned <SortIcon col="assignedTo" /></th>
+                    <th onClick={() => toggleSort('createdAt')} style={{ padding: '12px 12px', fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer' }}>Created <SortIcon col="createdAt" /></th>
+                    <th style={{ padding: '12px 12px', fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Dates</th>
+                    <th style={{ padding: '12px 16px', width: 50 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Loading records...</td></tr>
+                  ) : records.length === 0 ? (
                     <tr>
-                      <th style={{ width: 40 }}><input type="checkbox" checked={selectedIds.length === records.length} onChange={toggleAll} /></th>
-                      <th onClick={() => toggleSort('companyName')} style={{ cursor: 'pointer' }}>Company / Contact <SortIcon col="companyName" /></th>
-                      <th onClick={() => toggleSort('hallNumber')} style={{ cursor: 'pointer' }}>Hall / Stall <SortIcon col="hallNumber" /></th>
-                      <th style={{ width: 160 }}>Designation / Email</th>
-                      <th>Mobiles</th>
-                      <th>Labels</th>
-                      <th>Assigned</th>
-                      <th onClick={() => toggleSort('createdAt')} style={{ cursor: 'pointer' }}>Created <SortIcon col="createdAt" /></th>
-                      <th style={{ width: 120 }}>Dates / Notes</th>
-                      <th style={{ width: 48 }}></th>
+                      <td colSpan={10} style={{ padding: 60, textAlign: 'center' }}>
+                        <div style={{ width: 48, height: 48, background: '#f1f5f9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                          <FileText size={20} style={{ color: '#94a3b8' }} />
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: '#1e293b' }}>No records found</div>
+                        <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>Add a lead manually or make sure your import file was correct.</p>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {records.map(record => (
-                      <tr key={record._id} onClick={() => setSelectedRecord(record)}>
-                        <td onClick={e => e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(record._id)} onChange={() => toggleSelect(record._id)} /></td>
-                        <td>
-                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{record.companyName || '—'}</div>
-                          <div style={{ fontSize: 12, color: '#6b7280' }}>{record.contactPerson || '—'}</div>
+                  ) : (
+                    records.map((r, i) => (
+                      <tr
+                        key={r._id} onClick={() => { setSelectedRecord(r); setDrawerTab('details'); }}
+                        style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? 'white' : '#fcfcfd', cursor: 'pointer', transition: 'background 0.15s' }}
+                        onMouseOver={e => e.currentTarget.style.background = '#f1f5f9'} onMouseOut={e => e.currentTarget.style.background = i % 2 === 0 ? 'white' : '#fcfcfd'}
+                      >
+                        <td style={{ padding: '12px 16px' }} onClick={e => e.stopPropagation()}>
+                          <input type="checkbox" checked={selectedIds.includes(r._id)} onChange={() => toggleSelect(r._id)} style={{ cursor: 'pointer' }} />
                         </td>
-                        <td>
-                          <div style={{ fontWeight: 500 }}>H: {record.hallNumber || '—'}</div>
-                          <div style={{ fontSize: 12, color: '#6b7280' }}>S: {record.stallNumber || '—'}</div>
+                        <td style={{ padding: '12px 12px', fontSize: 13, color: '#475569' }}>
+                          {r.hallNumber && r.stallNumber
+                            ? `Hall ${r.hallNumber} / Stall ${r.stallNumber}`
+                            : r.hallNumber
+                              ? `Hall ${r.hallNumber}`
+                              : r.stallNumber
+                                ? `Stall ${r.stallNumber}`
+                                : '—'}
                         </td>
-                        <td style={{ maxWidth: 160 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={record.position || ''}>{record.position || '—'}</div>
-                          <div style={{ fontSize: 12, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={record.email || ''}>{record.email || '—'}</div>
-                        </td>
-                        <td>
-                          <div style={{ fontSize: 13 }}>{record.mobile1 || '—'}</div>
-                          {record.mobile2 && <div style={{ fontSize: 12, color: '#6b7280' }}>{record.mobile2}</div>}
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            {record.isConverted ? (
-                              <span className="badge badge-converted">Converted</span>
-                            ) : (
-                              (record.labels || []).map(l => (
-                                <span key={l} className={LABEL_CLASSES[l] || 'badge'}>{l}</span>
-                              ))
+                        <td style={{ padding: '12px 12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13.5, maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.companyName || '-'}>
+                              {r.companyName || '-'}
+                            </div>
+                            {r.contactPerson && (
+                              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }} title={r.contactPerson}>
+                                {r.contactPerson}
+                              </div>
                             )}
                           </div>
                         </td>
-                        <td>
-                          {record.assignedTo ? (
+                        <td style={{ padding: '12px 12px', color: '#475569', fontSize: 13 }}>{r.mobile1 || r.mobile2 || '-'}</td>
+                        <td style={{ padding: '12px 12px', color: '#475569', fontSize: 13, maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.email}>{r.email || '-'}</td>
+                        <td style={{ padding: '12px 12px' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {r.isConverted && <span className="badge badge-converted" style={{ fontSize: 10 }}>Converted</span>}
+                            {!r.isConverted && (r.labels || []).slice(0, 2).map(l => <span key={l} className={LABEL_CLASSES[l] || 'badge'} style={{ fontSize: 10 }}>{l}</span>)}
+                            {!r.isConverted && (r.labels?.length || 0) > 2 && <span className="badge" style={{ fontSize: 10 }}>+{(r.labels?.length || 0) - 2}</span>}
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 12px' }}>
+                          {r.assignedTo ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <div style={{ 
-                                width: 22, height: 22, borderRadius: '50%', background: '#e0e7ff', color: '#4338ca',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700
-                              }}>
-                                {record.assignedTo.name.split(' ').map(n => n[0]).join('')}
+                              <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#e0e7ff', color: '#4338ca', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 }}>
+                                {r.assignedTo.name.split(' ').map((n: string) => n[0]).join('')}
                               </div>
-                              <span style={{ fontSize: 12.5, color: '#374151' }}>{record.assignedTo.name}</span>
+                              <span style={{ fontSize: 13, color: '#374151' }}>{r.assignedTo.name}</span>
                             </div>
                           ) : (
-                            <span style={{ color: '#9ca3af', fontSize: 12.5 }}>Unassigned</span>
+                            <span style={{ color: '#9ca3af', fontSize: 13 }}>Unassigned</span>
                           )}
                         </td>
-                        <td style={{ whiteSpace: 'nowrap', color: '#6b7280', fontSize: 12.5 }}>
-                          {format(new Date(record.createdAt), 'MMM d, yyyy')}
+                        <td style={{ padding: '12px 12px', color: '#64748b', fontSize: 12.5 }}>
+                          {r.createdAt ? format(new Date(r.createdAt), 'MMM d, yyyy') : '—'}
                         </td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {record.installationDate ? (
-                              <div style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 5,
-                                background: '#f0fdf4', border: '1px solid #bbf7d0',
-                                borderRadius: 8, padding: '3px 8px', whiteSpace: 'nowrap'
-                              }}>
-                                <Calendar size={11} style={{ color: '#166534', flexShrink: 0 }} />
-                                <span style={{ fontSize: 11, fontWeight: 600, color: '#166534' }}>
-                                  {format(new Date(record.installationDate), 'MMM d')}
-                                </span>
-                              </div>
-                            ) : record.followUpDate ? (
-                              <div style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 5,
-                                background: '#fffbeb', border: '1px solid #fde68a',
-                                borderRadius: 8, padding: '3px 8px', whiteSpace: 'nowrap'
-                              }}>
-                                <Clock size={11} style={{ color: '#b45309', flexShrink: 0 }} />
-                                <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309' }}>
-                                  {format(new Date(record.followUpDate), 'MMM d')}
-                                </span>
-                              </div>
-                            ) : record.callbackDate ? (
-                              <div style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 5,
-                                background: '#eff6ff', border: '1px solid #bfdbfe',
-                                borderRadius: 8, padding: '3px 8px', whiteSpace: 'nowrap'
-                              }}>
-                                <Calendar size={11} style={{ color: '#1d4ed8', flexShrink: 0 }} />
-                                <span style={{ fontSize: 11, fontWeight: 600, color: '#1d4ed8' }}>
-                                  {format(new Date(record.callbackDate), 'MMM d')}
-                                </span>
-                              </div>
-                            ) : null}
-
-                            {(record.noteCount || 0) > 0 && (
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); setSelectedRecord(record); setDrawerTab('notes'); }}
-                                style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', padding: '3px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
-                                title={`${record.noteCount} Note(s)`}
+                        <td style={{ padding: '12px 12px' }}>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            {r.callbackDate && <span title={`Callback: ${format(new Date(r.callbackDate), 'MMM d')}`} style={{ background: '#eff6ff', color: '#1d4ed8', padding: '4px 6px', borderRadius: 6, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={12} /> {format(new Date(r.callbackDate), 'MMM d')}</span>}
+                            {r.followUpDate && !r.callbackDate && <span title={`Follow Up: ${format(new Date(r.followUpDate), 'MMM d')}`} style={{ background: '#fffbeb', color: '#b45309', padding: '4px 6px', borderRadius: 6, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={12} /> {format(new Date(r.followUpDate), 'MMM d')}</span>}
+                            {(r.noteCount || 0) > 0 && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedRecord(r); setDrawerTab('notes'); }}
+                                style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', padding: '3px 6px', borderRadius: 6, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                                title={`${r.noteCount} Note(s)`}
                               >
-                                <FileText size={12} /> {record.noteCount}
+                                <FileText size={12} /> {r.noteCount}
                               </button>
                             )}
                           </div>
                         </td>
-                        <td onClick={e => e.stopPropagation()}>
-                          <RowMenu record={record} onRefresh={fetchRecords} users={users} />
+                        <td style={{ padding: '12px 16px' }} onClick={e => e.stopPropagation()}>
+                          <RowMenu record={r} onRefresh={() => fetchRecords()} users={users} />
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {!loading && records.length > 0 && (
+              <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white' }}>
+                <div style={{ fontSize: 13, color: '#64748b' }}>Page <span style={{ fontWeight: 600, color: '#0f172a' }}>{page}</span> of <span style={{ fontWeight: 600, color: '#0f172a' }}>{pages}</span></div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4, background: 'white', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13, cursor: page === 1 ? 'not-allowed' : 'pointer' }}><ChevronLeft size={14} /> Prev</button>
+                  <button onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages} style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4, background: 'white', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13, cursor: page === pages ? 'not-allowed' : 'pointer' }}>Next <ChevronRight size={14} /></button>
+                </div>
               </div>
             )}
           </div>
-
-          {/* Pagination */}
-          {pages > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
-              <span style={{ fontSize: 13, color: '#6b7280' }}>Page {page} of {pages}</span>
-              <div className="pagination">
-                <button className="page-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}><ChevronLeft size={14} /></button>
-                {Array.from({ length: Math.min(7, pages) }, (_, i) => {
-                  const p = i + 1;
-                  return <button key={p} className={`page-btn ${page === p ? 'active' : ''}`} onClick={() => setPage(p)}>{p}</button>;
-                })}
-                <button className="page-btn" onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}><ChevronRight size={14} /></button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
-      {showCreate && <CreateIntecModal onClose={() => setShowCreate(false)} onCreated={fetchRecords} />}
+      {showCreate && (
+        <CreateEventRecordModal
+          datasetId={id}
+          onClose={() => setShowCreate(false)}
+          onCreated={fetchRecords}
+        />
+      )}
+
       {selectedRecord && (
-        <IntecDrawer
+        <EventDrawer
           record={selectedRecord}
           defaultTab={drawerTab}
-          onClose={() => { setSelectedRecord(null); setDrawerTab('details'); }}
-          onRefresh={(updatedRecord) => {
+          onClose={() => setSelectedRecord(null)}
+          onRefresh={(updated) => {
             fetchRecords();
-            if (updatedRecord) setSelectedRecord(updatedRecord);
+            if (updated) setSelectedRecord(updated);
           }}
         />
       )}
@@ -1468,15 +1628,17 @@ function IntecPageContent() {
   );
 }
 
-export default function IntecPage() {
+export default function EventDatasetPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   return (
     <Suspense fallback={
-      <div className="empty-state">
-        <div className="spinner spinner-dark" style={{ width: 32, height: 32 }} />
-        <p>Loading...</p>
-      </div>
+      <ProtectedLayout>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', width: '100%' }}>
+          <div className="spinner spinner-dark" />
+        </div>
+      </ProtectedLayout>
     }>
-      <IntecPageContent />
+      <EventPageContent id={id} />
     </Suspense>
   );
 }

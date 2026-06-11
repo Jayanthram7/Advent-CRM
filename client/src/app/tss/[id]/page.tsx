@@ -4,11 +4,12 @@ import ProtectedLayout from '@/components/ProtectedLayout';
 import TopBar from '@/components/TopBar';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import { ChevronLeft, ChevronRight, X, FileText, Search, Database, MoreVertical, Tag, Clock, Calendar, CheckCircle, BarChart3, Filter, Trash2, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, FileText, Search, Database, MoreVertical, Tag, Clock, Calendar, CheckCircle, BarChart3, Filter, Trash2, RefreshCw, Users, AlertCircle, Edit } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { format } from 'date-fns';
+import { useAuth } from '@/context/AuthContext';
 
-const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead'];
+const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review'];
 const LABEL_CLASSES: Record<string, string> = {
   'Open': 'badge badge-open',
   'Call Back': 'badge badge-call-back',
@@ -17,9 +18,10 @@ const LABEL_CLASSES: Record<string, string> = {
   'Follow Up': 'badge badge-follow-up',
   'Hot Lead': 'badge badge-hot-lead',
   'Cold Lead': 'badge badge-cold-lead',
+  'Review': 'badge badge-review',
 };
 
-interface TssRecord {
+export interface TssRecord {
   _id: string;
   datasetId: string;
   customerName: string;
@@ -35,12 +37,19 @@ interface TssRecord {
   data: Record<string, any>;
   notes?: { _id: string; content: string; authorName: string; createdAt: string }[];
   createdAt: string;
+  assignedTo?: string | {
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+  } | null;
 }
 
 // ─── Row Menu ──────────────────────────────────────────────────────────────────
-function RowMenu({ record, onRefresh }: { record: TssRecord; onRefresh: () => void }) {
+function RowMenu({ record, onRefresh, users }: { record: TssRecord; onRefresh: () => void; users: any[] }) {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const [submenu, setSubmenu] = useState<'labels' | 'date_followup' | 'date_renewal' | 'note' | null>(null);
+  const [submenu, setSubmenu] = useState<'labels' | 'date_followup' | 'date_renewal' | 'note' | 'assign' | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<string[]>(record.labels || []);
   const [date, setDate] = useState('');
   const [newNote, setNewNote] = useState('');
@@ -101,6 +110,17 @@ function RowMenu({ record, onRefresh }: { record: TssRecord; onRefresh: () => vo
     } catch { toast.error('Failed to delete record'); }
   };
 
+  const handleAssign = async (userId: string | null) => {
+    try {
+      await api.put(`/tss/records/${record._id}`, { assignedTo: userId });
+      toast.success(userId ? 'Assigned successfully' : 'Unassigned successfully');
+      onRefresh();
+      setOpen(false);
+    } catch { toast.error('Failed to assign record'); }
+  };
+
+  const currentAssignedId = record.assignedTo && typeof record.assignedTo === 'object' ? (record.assignedTo as any)._id : record.assignedTo;
+
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
@@ -121,8 +141,13 @@ function RowMenu({ record, onRefresh }: { record: TssRecord; onRefresh: () => vo
                 <div className="dropdown-item" onClick={e => { e.stopPropagation(); closeRecord(); }}><CheckCircle size={14} />Mark as Closed</div>
               )}
               <div className="dropdown-item" onClick={e => { e.stopPropagation(); setNoteOpen(true); }}><FileText size={14} />Add Note</div>
-              <div style={{ height: 1, background: '#f0f2f7', margin: '4px 0' }} />
-              <div className="dropdown-item danger" onClick={e => { e.stopPropagation(); deleteRecord(); }}><Trash2 size={14} />Delete Record</div>
+              {user?.role !== 'Agent' && (
+                <>
+                  <div className="dropdown-item" onClick={e => { e.stopPropagation(); setSubmenu('assign'); }}><Users size={14} />Assign Agent</div>
+                  <div style={{ height: 1, background: '#f0f2f7', margin: '4px 0' }} />
+                  <div className="dropdown-item danger" onClick={e => { e.stopPropagation(); deleteRecord(); }}><Trash2 size={14} />Delete Record</div>
+                </>
+              )}
             </>
           )}
 
@@ -169,6 +194,35 @@ function RowMenu({ record, onRefresh }: { record: TssRecord; onRefresh: () => vo
               </div>
             </div>
           )}
+
+          {submenu === 'assign' && (
+            <div style={{ padding: 10 }} onClick={e => e.stopPropagation()}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>ASSIGN AGENT</p>
+              <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer', fontSize: 13, color: '#ef4444', fontWeight: 500 }}>
+                  <input
+                    type="radio"
+                    checked={!currentAssignedId}
+                    onChange={() => handleAssign(null)}
+                  />
+                  Unassigned / Clear
+                </label>
+                {users.map((u: any) => (
+                  <label key={u._id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer', fontSize: 13 }}>
+                    <input
+                      type="radio"
+                      checked={currentAssignedId === u._id}
+                      onChange={() => handleAssign(u._id)}
+                    />
+                    <span>{u.name} <span style={{ fontSize: 11, color: '#94a3b8' }}>({u.role})</span></span>
+                  </label>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="btn-secondary" onClick={() => setSubmenu(null)} style={{ flex: 1, padding: '7px' }}>Back</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -176,7 +230,10 @@ function RowMenu({ record, onRefresh }: { record: TssRecord; onRefresh: () => vo
 }
 
 // ─── Record Detail Drawer ───────────────────────────────────────────────────────
-function RecordDrawer({ record, defaultTab = 'details', onClose }: { record: TssRecord; defaultTab?: 'details' | 'notes'; onClose: () => void }) {
+export function RecordDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { record: TssRecord; defaultTab?: 'details' | 'notes'; onClose: () => void; onRefresh?: (updatedRecord?: TssRecord) => void }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+  const [showEdit, setShowEdit] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'notes'>(defaultTab);
 
   const InfoRow = ({ label, value }: { label: string; value?: string | number | boolean }) => (
@@ -213,19 +270,53 @@ function RecordDrawer({ record, defaultTab = 'details', onClose }: { record: Tss
                 </div>
               </div>
             </div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4, borderRadius: 6 }}><X size={20} /></button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4, borderRadius: 6 }}><X size={20} /></button>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 0, marginBottom: -1 }}>
-            {(['details', 'notes'] as const).map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} style={{
-                padding: '10px 18px', fontSize: 13.5, fontWeight: activeTab === tab ? 600 : 400,
-                border: 'none', background: 'none', cursor: 'pointer', color: activeTab === tab ? '#1a73e8' : '#6b7280',
-                borderBottom: activeTab === tab ? '2px solid #1a73e8' : '2px solid transparent', transition: 'all 0.15s', textTransform: 'capitalize'
-              }}>
-                {tab === 'notes' ? `Notes (${record.notes?.length || 0})` : 'Details'}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: -1 }}>
+            <div style={{ display: 'flex', gap: 0 }}>
+              {(['details', 'notes'] as const).map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab)} style={{
+                  padding: '10px 18px', fontSize: 13.5, fontWeight: activeTab === tab ? 600 : 400,
+                  border: 'none', background: 'none', cursor: 'pointer', color: activeTab === tab ? '#1a73e8' : '#6b7280',
+                  borderBottom: activeTab === tab ? '2px solid #1a73e8' : '2px solid transparent', transition: 'all 0.15s', textTransform: 'capitalize'
+                }}>
+                  {tab === 'notes' ? `Notes (${record.notes?.length || 0})` : 'Details'}
+                </button>
+              ))}
+            </div>
+            {isAdmin && (
+              <button
+                onClick={() => setShowEdit(true)}
+                title="Edit TSS Details"
+                style={{
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: 8,
+                  padding: '6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  marginBottom: 6
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.background = '#dbeafe';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.background = '#eff6ff';
+                }}
+              >
+                <Edit size={14} />
+                Edit Entry
               </button>
-            ))}
+            )}
           </div>
         </div>
 
@@ -279,7 +370,92 @@ function RecordDrawer({ record, defaultTab = 'details', onClose }: { record: Tss
           )}
         </div>
       </div>
+      {showEdit && (
+        <EditTssRecordModal
+          record={record}
+          onClose={() => setShowEdit(false)}
+          onUpdated={(updated) => {
+            if (onRefresh) onRefresh(updated);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+// ─── Edit TSS Record Modal ──────────────────────────────────────────────────
+function EditTssRecordModal({ record, onClose, onUpdated }: { record: TssRecord; onClose: () => void; onUpdated: (updatedRecord: TssRecord) => void }) {
+  const [form, setForm] = useState({
+    customerName: record.customerName || '',
+    serialNumber: record.serialNumber || '',
+    flavour: record.flavour || '',
+    mobileNumber: record.mobileNumber || '',
+    releaseVersion: record.releaseVersion || ''
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.customerName) {
+      toast.error('Customer name is required');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await api.put(`/tss/records/${record._id}`, form);
+      toast.success('TSS record updated successfully!');
+      onUpdated(res.data);
+      onClose();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update record');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 500 }}>
+        <div className="modal-header">
+          <h2 className="modal-title">Edit TSS Record</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="form-group">
+                <label className="form-label">Customer Name *</label>
+                <input className="form-input" value={form.customerName} onChange={e => set('customerName', e.target.value)} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Serial Number</label>
+                <input className="form-input" value={form.serialNumber} onChange={e => set('serialNumber', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Flavour</label>
+                <input className="form-input" value={form.flavour} onChange={e => set('flavour', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Mobile Number</label>
+                <input className="form-input" value={form.mobileNumber} onChange={e => set('mobileNumber', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Release Version</label>
+                <input className="form-input" value={form.releaseVersion} onChange={e => set('releaseVersion', e.target.value)} />
+              </div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? <><div className="spinner" style={{ width: 16, height: 16 }} /> Saving...</> : <><Edit size={15} />Save Changes</>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -323,6 +499,7 @@ function AnalyticsModal({ datasetId, onClose }: { datasetId: string; onClose: ()
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function TssDatasetPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { user } = useAuth();
   
   const [records, setRecords] = useState<TssRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -332,6 +509,13 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
   const [search, setSearch] = useState('');
   const [viewFilter, setViewFilter] = useState(''); // open, followup, closed, dateset
   const [tickedIds, setTickedIds] = useState<Record<string, boolean>>({});
+  const [users, setUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.get('/users')
+      .then(res => setUsers(res.data))
+      .catch(err => console.error('Error fetching users:', err));
+  }, []);
 
   useEffect(() => {
     if (id) {
@@ -394,7 +578,30 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
   return (
     <ProtectedLayout>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#f8fafc' }}>
-        <TopBar title="TSS Dataset" />
+        <TopBar title="TSS Dataset">
+          {user?.role === 'Admin' && (
+            <button
+              className={viewFilter === 'review' ? 'btn-danger' : 'btn-secondary'}
+              onClick={() => {
+                setViewFilter(prev => prev === 'review' ? '' : 'review');
+                setPage(1);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                ...(viewFilter === 'review' ? {
+                  background: '#fee2e2',
+                  color: '#b91c1c',
+                  borderColor: '#fca5a5'
+                } : {})
+              }}
+            >
+              <AlertCircle size={14} style={viewFilter === 'review' ? { color: '#b91c1c' } : {}} />
+              Needs Review
+            </button>
+          )}
+        </TopBar>
         
         <div style={{ padding: '24px 32px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -550,7 +757,7 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
                           </div>
                         </td>
                         <td style={{ padding: '12px 12px' }} onClick={e => e.stopPropagation()}>
-                          <RowMenu record={r} onRefresh={() => fetchRecords()} />
+                          <RowMenu record={r} onRefresh={() => fetchRecords()} users={users} />
                         </td>
                       </tr>
                     ))
@@ -573,7 +780,7 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
       
-      {selectedRecord && <RecordDrawer record={selectedRecord} defaultTab={drawerTab} onClose={() => setSelectedRecord(null)} />}
+      {selectedRecord && <RecordDrawer record={selectedRecord} defaultTab={drawerTab} onClose={() => setSelectedRecord(null)} onRefresh={() => fetchRecords()} />}
       {showAnalytics && <AnalyticsModal datasetId={id} onClose={() => setShowAnalytics(false)} />}
     </ProtectedLayout>
   );

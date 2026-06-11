@@ -9,7 +9,8 @@ const roleMiddleware = require('../middleware/roleMiddleware');
 
 const Lead = require('../models/Lead');
 const Call = require('../models/Call');
-const Intec = require('../models/Intec');
+const EventRecord = require('../models/EventRecord');
+const EventDataset = require('../models/EventDataset');
 const TssRecord = require('../models/TssRecord');
 const TssDataset = require('../models/TssDataset');
 
@@ -22,6 +23,230 @@ router.get('/', async (req, res) => {
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: 'Server error fetching users' });
+  }
+});
+
+// GET /api/users/tasks - get tasks assigned to a specific user (or logged-in user if agent)
+router.get('/tasks', async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 25,
+      search = '',
+      status = 'Pending',
+      source = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      userId,
+      label = '',
+      startDate,
+      endDate
+    } = req.query;
+
+    let targetUserId = userId;
+    const isAdminOrManager = req.user.role === 'Admin' || req.user.role === 'Manager';
+
+    if (!isAdminOrManager || !targetUserId) {
+      if (!isAdminOrManager) {
+        targetUserId = req.user._id;
+      }
+    }
+
+    const query = {};
+    if (targetUserId) {
+      query.assignedTo = targetUserId;
+    } else {
+      query.assignedTo = { $ne: null };
+    }
+
+    const [leads, calls, eventRecords, tssRecords] = await Promise.all([
+      Lead.find(query).populate('assignedTo', 'name email role').lean(),
+      Call.find(query).populate('assignedTo', 'name email role').lean(),
+      EventRecord.find(query).populate('datasetId', 'name').populate('assignedTo', 'name email role').lean(),
+      TssRecord.find(query).populate('datasetId', 'name').populate('assignedTo', 'name email role').lean()
+    ]);
+
+    const unified = [];
+
+    // Map Leads
+    leads.forEach(l => {
+      unified.push({
+        _id: `leads_${l._id}`,
+        originalId: l._id,
+        source: 'leads',
+        name: `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'N/A',
+        company: l.company || 'N/A',
+        email: l.email || 'N/A',
+        phone: l.phone || l.secondaryPhone || 'N/A',
+        reason: l.reason || '—',
+        licenseNumber: l.licenseNumber || '—',
+        status: l.status || 'Open',
+        labels: l.labels || [],
+        callbackDate: l.callbackDate,
+        followUpDate: l.followUpDate,
+        installationDate: l.installationDate,
+        createdAt: l.createdAt,
+        assignedTo: l.assignedTo
+      });
+    });
+
+    // Map Calls
+    calls.forEach(c => {
+      unified.push({
+        _id: `calls_${c._id}`,
+        originalId: c._id,
+        source: 'calls',
+        name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'N/A',
+        company: c.company || 'N/A',
+        email: c.email || 'N/A',
+        phone: c.phone || c.secondaryPhone || 'N/A',
+        reason: c.reason || '—',
+        licenseNumber: c.licenseNumber || '—',
+        status: c.status || 'Open',
+        labels: c.labels || [],
+        callbackDate: c.callbackDate,
+        followUpDate: c.followUpDate,
+        installationDate: c.installationDate,
+        createdAt: c.createdAt,
+        assignedTo: c.assignedTo
+      });
+    });
+
+    // Map Event Records
+    eventRecords.forEach(i => {
+      unified.push({
+        _id: `events_${i._id}`,
+        originalId: i._id,
+        datasetId: i.datasetId?._id || null,
+        datasetName: i.datasetId?.name || 'Event Dataset',
+        source: 'events',
+        name: i.contactPerson || 'N/A',
+        company: i.companyName || 'N/A',
+        email: i.email || 'N/A',
+        phone: i.mobile1 || i.mobile2 || 'N/A',
+        reason: i.position || '—',
+        licenseNumber: i.stallNumber ? `Stall: ${i.stallNumber}` : '—',
+        status: i.status || 'Open',
+        labels: i.labels || [],
+        callbackDate: i.callbackDate,
+        followUpDate: i.followUpDate,
+        installationDate: i.installationDate,
+        createdAt: i.createdAt,
+        assignedTo: i.assignedTo
+      });
+    });
+
+    // Map TSS Records
+    tssRecords.forEach(t => {
+      unified.push({
+        _id: `tss_${t._id}`,
+        originalId: t._id,
+        datasetId: t.datasetId?._id || null,
+        datasetName: t.datasetId?.name || 'TSS Dataset',
+        source: 'tss',
+        name: t.customerName || 'N/A',
+        company: t.flavour || 'N/A',
+        email: 'N/A',
+        phone: t.mobileNumber || 'N/A',
+        reason: t.flavour || '—',
+        licenseNumber: t.serialNumber || '—',
+        status: t.status || 'Open',
+        labels: t.labels || [],
+        callbackDate: t.callbackDate,
+        followUpDate: t.followUpDate,
+        installationDate: t.renewalDate,
+        renewalDate: t.renewalDate,
+        createdAt: t.createdAt,
+        assignedTo: t.assignedTo
+      });
+    });
+
+    let filtered = unified;
+
+    // Filter by source
+    if (source) {
+      filtered = filtered.filter(item => item.source === source);
+    }
+
+    // Filter by status
+    if (status && status !== 'All') {
+      if (status === 'Pending') {
+        filtered = filtered.filter(item => 
+          item.status.toLowerCase() !== 'converted' && 
+          item.status.toLowerCase() !== 'closed'
+        );
+      } else {
+        filtered = filtered.filter(item => item.status.toLowerCase() === status.toLowerCase());
+      }
+    }
+
+    // Filter by label
+    if (label) {
+      filtered = filtered.filter(item => item.labels.includes(label));
+    }
+
+    // Filter by search query
+    if (search) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter(item => 
+        item.name.toLowerCase().includes(q) ||
+        item.company.toLowerCase().includes(q) ||
+        item.email.toLowerCase().includes(q) ||
+        item.phone.toLowerCase().includes(q) ||
+        item.reason.toLowerCase().includes(q) ||
+        item.licenseNumber.toLowerCase().includes(q)
+      );
+    }
+
+    // Filter by date range (createdAt)
+    if (startDate || endDate) {
+      if (startDate) {
+        const start = new Date(startDate + 'T00:00:00');
+        filtered = filtered.filter(item => new Date(item.createdAt) >= start);
+      }
+      if (endDate) {
+        const end = new Date(endDate + 'T23:59:59.999');
+        filtered = filtered.filter(item => new Date(item.createdAt) <= end);
+      }
+    }
+
+    // Sort records
+    filtered.sort((a, b) => {
+      let valA = a[sortBy];
+      let valB = b[sortBy];
+
+      if (sortBy === 'createdAt' || sortBy === 'callbackDate' || sortBy === 'followUpDate' || sortBy === 'installationDate') {
+        const timeA = valA ? new Date(valA).getTime() : 0;
+        const timeB = valB ? new Date(valB).getTime() : 0;
+        return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+
+      valA = String(valA || '').toLowerCase();
+      valB = String(valB || '').toLowerCase();
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    // Paginate
+    const total = filtered.length;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const pages = Math.ceil(total / limitNum);
+    const skip = (pageNum - 1) * limitNum;
+    const paginated = filtered.slice(skip, skip + limitNum);
+
+    res.json({
+      tasks: paginated,
+      total,
+      page: pageNum,
+      pages,
+      limit: limitNum
+    });
+  } catch (err) {
+    console.error('Error fetching tasks:', err);
+    res.status(500).json({ message: 'Server error fetching tasks' });
   }
 });
 
@@ -41,10 +266,10 @@ router.get('/customers', async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
-    const [leads, calls, intecs, tssRecords] = await Promise.all([
+    const [leads, calls, eventRecords, tssRecords] = await Promise.all([
       Lead.find().lean(),
       Call.find().lean(),
-      Intec.find().lean(),
+      EventRecord.find().populate('datasetId', 'name').lean(),
       TssRecord.find().populate('datasetId', 'name').lean()
     ]);
 
@@ -82,12 +307,14 @@ router.get('/customers', async (req, res) => {
       });
     });
 
-    // Map Intec
-    intecs.forEach(i => {
+    // Map Event Records
+    eventRecords.forEach(i => {
       unified.push({
-        _id: `intec_${i._id}`,
+        _id: `events_${i._id}`,
         originalId: i._id,
-        source: 'intec',
+        datasetId: i.datasetId?._id || null,
+        datasetName: i.datasetId?.name || 'Event Dataset',
+        source: 'events',
         name: i.contactPerson || 'N/A',
         company: i.companyName || 'N/A',
         email: i.email || 'N/A',

@@ -13,6 +13,10 @@ const activitySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Intec'
   },
+  eventRecord: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EventRecord'
+  },
   type: {
     type: String,
     enum: ['Creation', 'Label', 'Note', 'Assignment', 'Conversion', 'DateUpdate', 'Update', 'WhatsApp', 'Email'],

@@ -6,33 +6,13 @@ import {
   Home, Users, Target, LogOut,
   ChevronDown, ChevronRight, ChevronLeft, Circle,
   Inbox, Clock, Calendar, CheckCircle2,
-  Database, Upload, FileText, X, Phone, Building2, Contact
+  Database, Upload, FileText, X, Phone, Building2, Contact, CheckSquare
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-const LEAD_VIEWS = [
-  { label: 'Open',         href: '/leads?view=open',         icon: Inbox },
-  { label: 'Follow Up',    href: '/leads?view=followup',     icon: Clock },
-  { label: 'Installation', href: '/leads?view=installation', icon: Calendar },
-  { label: 'Date Set',     href: '/leads?view=dateset',      icon: Calendar },
-  { label: 'Completed',    href: '/leads?view=completed',    icon: CheckCircle2 },
-];
 
-const CALL_VIEWS = [
-  { label: 'Open',         href: '/calls?view=open',         icon: Inbox },
-  { label: 'Follow Up',    href: '/calls?view=followup',     icon: Clock },
-  { label: 'Installation', href: '/calls?view=installation', icon: Calendar },
-  { label: 'Date Set',     href: '/calls?view=dateset',      icon: Calendar },
-  { label: 'Completed',    href: '/calls?view=completed',    icon: CheckCircle2 },
-];
 
-const INTEC_VIEWS = [
-  { label: 'Open',         href: '/intec?view=open',         icon: Inbox },
-  { label: 'Follow Up',    href: '/intec?view=followup',     icon: Clock },
-  { label: 'Installation', href: '/intec?view=installation', icon: Calendar },
-  { label: 'Date Set',     href: '/intec?view=dateset',      icon: Calendar },
-  { label: 'Completed',    href: '/intec?view=completed',    icon: CheckCircle2 },
-];
+
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -41,13 +21,12 @@ export default function Sidebar() {
   const { user, logout, isAdmin, sidebarCollapsed, toggleSidebar } = useAuth();
 
   const isLeadsActive = pathname === '/leads' || pathname.startsWith('/leads/');
-  const [leadsOpen, setLeadsOpen] = useState(isLeadsActive);
-
   const isCallsActive = pathname === '/calls' || pathname.startsWith('/calls/');
-  const [callsOpen, setCallsOpen] = useState(isCallsActive);
 
-  const isIntecActive = pathname === '/intec' || pathname.startsWith('/intec/');
-  const [intecOpen, setIntecOpen] = useState(isIntecActive);
+  const isEventsActive = pathname.startsWith('/events');
+  const [eventsOpen, setEventsOpen] = useState(isEventsActive);
+  const [eventDatasets, setEventDatasets] = useState<any[]>([]);
+  const [isEventImportModalOpen, setIsEventImportModalOpen] = useState(false);
 
   const isTssActive = pathname.startsWith('/tss');
   const [tssOpen, setTssOpen] = useState(isTssActive);
@@ -65,6 +44,17 @@ export default function Sidebar() {
   const [adminTargetRoute, setAdminTargetRoute] = useState('/users');
 
   useEffect(() => {
+    fetch('/api/events/datasets', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setEventDatasets(data);
+      })
+      .catch(err => console.error('Error fetching Event datasets:', err));
+  }, [isEventImportModalOpen]);
+
+  useEffect(() => {
     fetch('/api/tss/datasets', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
@@ -75,20 +65,12 @@ export default function Sidebar() {
       .catch(err => console.error('Error fetching TSS datasets:', err));
   }, [isImportModalOpen]);
 
-  // Keep expanded if navigating between lead sub-views
-  useEffect(() => {
-    if (isLeadsActive) setLeadsOpen(true);
-  }, [isLeadsActive]);
 
-  // Keep expanded if navigating between call sub-views
-  useEffect(() => {
-    if (isCallsActive) setCallsOpen(true);
-  }, [isCallsActive]);
 
-  // Keep expanded if navigating between Intec sub-views
+  // Keep expanded if navigating between Event views
   useEffect(() => {
-    if (isIntecActive) setIntecOpen(true);
-  }, [isIntecActive]);
+    if (isEventsActive) setEventsOpen(true);
+  }, [isEventsActive]);
 
   const currentView = searchParams.get('view');
 
@@ -208,177 +190,60 @@ export default function Sidebar() {
         {!sidebarCollapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />}
         <div className="sidebar-section-title">Sales</div>
 
-        {/* Leads parent row */}
+        {/* Leads */}
         <Link
           href="/leads"
-          className={`sidebar-item ${isLeadsActive && !currentView ? 'active' : ''}`}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', paddingRight: sidebarCollapsed ? 0 : 8 }}
+          className={`sidebar-item ${isLeadsActive ? 'active' : ''}`}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Target size={15} />
-            <span className="sidebar-item-text">Leads</span>
-          </div>
-          {!sidebarCollapsed && (
-            <div
-              onClick={(e) => {
-                e.preventDefault();
-                setLeadsOpen(o => !o);
-              }}
-              style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <span className="sidebar-arrow" style={{ opacity: 0.5, transition: 'transform 0.2s', transform: leadsOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
-                <ChevronDown size={13} />
-              </span>
-            </div>
-          )}
+          <Target size={15} />
+          <span className="sidebar-item-text">Leads</span>
         </Link>
 
-        {/* Sub-items */}
-        {leadsOpen && !sidebarCollapsed && (
-          <div style={{ marginLeft: 0 }}>
-            {LEAD_VIEWS.map(({ label, href, icon: Icon }) => {
-              const active = isSubActive(href, '/leads');
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`sidebar-item ${active ? 'active' : ''}`}
-                  style={{ paddingLeft: 38, fontSize: 13 }}
-                >
-                  <Icon size={13} style={{ opacity: active ? 1 : 0.6 }} />
-                  <span className="sidebar-item-text">{label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Calls parent row */}
+        {/* Calls */}
         <Link
           href="/calls"
-          className={`sidebar-item ${isCallsActive && !currentView ? 'active' : ''}`}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', paddingRight: sidebarCollapsed ? 0 : 8 }}
+          className={`sidebar-item ${isCallsActive ? 'active' : ''}`}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Phone size={15} />
-            <span className="sidebar-item-text">Calls</span>
-          </div>
-          {!sidebarCollapsed && (
-            <div
-              onClick={(e) => {
-                e.preventDefault();
-                setCallsOpen(o => !o);
-              }}
-              style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <span className="sidebar-arrow" style={{ opacity: 0.5, transition: 'transform 0.2s', transform: callsOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
-                <ChevronDown size={13} />
-              </span>
-            </div>
-          )}
+          <Phone size={15} />
+          <span className="sidebar-item-text">Calls</span>
         </Link>
 
-        {/* Sub-items */}
-        {callsOpen && !sidebarCollapsed && (
-          <div style={{ marginLeft: 0 }}>
-            {CALL_VIEWS.map(({ label, href, icon: Icon }) => {
-              const active = isSubActive(href, '/calls');
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`sidebar-item ${active ? 'active' : ''}`}
-                  style={{ paddingLeft: 38, fontSize: 13 }}
-                >
-                  <Icon size={13} style={{ opacity: active ? 1 : 0.6 }} />
-                  <span className="sidebar-item-text">{label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Intec parent row */}
+        {/* Events parent row */}
         <Link
-          href="/intec"
-          className={`sidebar-item ${isIntecActive && !currentView ? 'active' : ''}`}
+          href="#"
+          onClick={(e) => { e.preventDefault(); setEventsOpen(o => !o); }}
+          className={`sidebar-item ${isEventsActive ? 'active' : ''}`}
           style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', paddingRight: sidebarCollapsed ? 0 : 8 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Building2 size={15} />
-            <span className="sidebar-item-text">Intec</span>
-          </div>
-          {!sidebarCollapsed && (
-            <div
-              onClick={(e) => {
-                e.preventDefault();
-                setIntecOpen(o => !o);
-              }}
-              style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <span className="sidebar-arrow" style={{ opacity: 0.5, transition: 'transform 0.2s', transform: intecOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
-                <ChevronDown size={13} />
-              </span>
-            </div>
-          )}
-        </Link>
-
-        {/* Sub-items */}
-        {intecOpen && !sidebarCollapsed && (
-          <div style={{ marginLeft: 0 }}>
-            {INTEC_VIEWS.map(({ label, href, icon: Icon }) => {
-              const active = isSubActive(href, '/intec');
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`sidebar-item ${active ? 'active' : ''}`}
-                  style={{ paddingLeft: 38, fontSize: 13 }}
-                >
-                  <Icon size={13} style={{ opacity: active ? 1 : 0.6 }} />
-                  <span className="sidebar-item-text">{label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-
-        {/* TSS Section */}
-        {!sidebarCollapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />}
-        <div className="sidebar-section-title">Operations</div>
-
-        <Link
-          href="#"
-          onClick={handleTssClick}
-          className={`sidebar-item ${isTssActive ? 'active' : ''}`}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', paddingRight: sidebarCollapsed ? 0 : 8 }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Database size={15} />
-            <span className="sidebar-item-text">TSS</span>
+            <span className="sidebar-item-text">Events</span>
           </div>
           {!sidebarCollapsed && (
             <div style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="sidebar-arrow" style={{ opacity: 0.5, transition: 'transform 0.2s', transform: tssOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
+              <span className="sidebar-arrow" style={{ opacity: 0.5, transition: 'transform 0.2s', transform: eventsOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
                 <ChevronDown size={13} />
               </span>
             </div>
           )}
         </Link>
 
-        {tssOpen && !sidebarCollapsed && (
+        {/* Events Sub-items */}
+        {eventsOpen && !sidebarCollapsed && (
           <div style={{ marginLeft: 0 }}>
-            <div
-              onClick={() => setIsImportModalOpen(true)}
-              className="sidebar-item"
-              style={{ paddingLeft: 38, fontSize: 13, cursor: 'pointer', color: '#38bdf8' }}
-            >
-              <Upload size={13} style={{ opacity: 1 }} />
-              <span className="sidebar-item-text">Import Data</span>
-            </div>
+            {user?.role !== 'Agent' && (
+              <div
+                onClick={() => setIsEventImportModalOpen(true)}
+                className="sidebar-item"
+                style={{ paddingLeft: 38, fontSize: 13, cursor: 'pointer', color: '#38bdf8' }}
+              >
+                <Upload size={13} style={{ opacity: 1 }} />
+                <span className="sidebar-item-text">Import Event</span>
+              </div>
+            )}
 
-            {tssDatasets.map((ds) => {
-              const href = `/tss/${ds._id}`;
+            {eventDatasets.map((ds) => {
+              const href = `/events/${ds._id}`;
               const active = pathname === href;
               return (
                 <Link
@@ -393,6 +258,74 @@ export default function Sidebar() {
               );
             })}
           </div>
+        )}
+
+        {/* Tasks */}
+        <Link
+          href="/tasks"
+          className={`sidebar-item ${pathname === '/tasks' ? 'active' : ''}`}
+          style={{ display: 'flex', alignItems: 'center', gap: 10 }}
+        >
+          <CheckSquare size={15} />
+          <span className="sidebar-item-text">Tasks</span>
+        </Link>
+
+        {/* TSS Section */}
+        {isAdmin && (
+          <>
+            {!sidebarCollapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />}
+            <div className="sidebar-section-title">Operations</div>
+
+            <Link
+              href="#"
+              onClick={handleTssClick}
+              className={`sidebar-item ${isTssActive ? 'active' : ''}`}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', paddingRight: sidebarCollapsed ? 0 : 8 }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Database size={15} />
+                <span className="sidebar-item-text">TSS</span>
+              </div>
+              {!sidebarCollapsed && (
+                <div style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="sidebar-arrow" style={{ opacity: 0.5, transition: 'transform 0.2s', transform: tssOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'flex' }}>
+                    <ChevronDown size={13} />
+                  </span>
+                </div>
+              )}
+            </Link>
+
+            {tssOpen && !sidebarCollapsed && (
+              <div style={{ marginLeft: 0 }}>
+                {user?.role !== 'Agent' && (
+                  <div
+                    onClick={() => setIsImportModalOpen(true)}
+                    className="sidebar-item"
+                    style={{ paddingLeft: 38, fontSize: 13, cursor: 'pointer', color: '#38bdf8' }}
+                  >
+                    <Upload size={13} style={{ opacity: 1 }} />
+                    <span className="sidebar-item-text">Import Data</span>
+                  </div>
+                )}
+
+                {tssDatasets.map((ds) => {
+                  const href = `/tss/${ds._id}`;
+                  const active = pathname === href;
+                  return (
+                    <Link
+                      key={ds._id}
+                      href={href}
+                      className={`sidebar-item ${active ? 'active' : ''}`}
+                      style={{ paddingLeft: 38, fontSize: 13 }}
+                    >
+                      <FileText size={13} style={{ opacity: active ? 1 : 0.6 }} />
+                      <span className="sidebar-item-text">{ds.name}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
 
         {isAdmin && (
@@ -463,6 +396,10 @@ export default function Sidebar() {
       {/* Dynamic Import to avoid SSR issues with Modal */}
       {isImportModalOpen && (
         <TssImportModal onClose={() => setIsImportModalOpen(false)} />
+      )}
+
+      {isEventImportModalOpen && (
+        <EventImportModal onClose={() => setIsEventImportModalOpen(false)} />
       )}
 
       {/* TSS Authentication Modal */}
@@ -641,6 +578,112 @@ function TssImportModal({ onClose }: { onClose: () => void }) {
             style={{ padding: '8px 16px', background: '#0ea5e9', border: 'none', color: '#fff', borderRadius: 6, cursor: loading ? 'wait' : 'pointer', fontWeight: 500 }}
           >
             {loading ? 'Importing...' : 'Import Data'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EventImportModal({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const [file, setFile] = useState<File | null>(null);
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleImport = async () => {
+    if (!file || !name.trim()) return alert('Name and File are required');
+    setLoading(true);
+
+    try {
+      const XLSX = await import('xlsx');
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const records = XLSX.utils.sheet_to_json(firstSheet);
+
+          const res = await fetch('/api/events/import', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ name, records })
+          });
+
+          if (!res.ok) throw new Error('Failed to import');
+          const dataJson = await res.json();
+          onClose();
+          if (dataJson.datasetId) {
+            router.push(`/events/${dataJson.datasetId}`);
+          }
+        } catch (err) {
+          console.error(err);
+          alert('Error parsing or importing Excel file');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    } catch (err) {
+      console.error('Error loading xlsx', err);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.6)', zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center'
+    }}>
+      <div style={{
+        background: '#1e293b', padding: 24, borderRadius: 12,
+        width: 400, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)', border: '1px solid #334155'
+      }}>
+        <h3 style={{ margin: '0 0 16px 0', color: '#f8fafc', fontSize: 18 }}>Import Event Data</h3>
+        
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: '#94a3b8' }}>Event Name</label>
+          <input
+            autoFocus
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            style={{ width: '100%', padding: '10px 12px', background: '#0f172a', border: '1px solid #334155', borderRadius: 6, color: '#f8fafc', outline: 'none' }}
+            placeholder="e.g. INTEC 2026"
+          />
+        </div>
+
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: '#94a3b8' }}>Excel File</label>
+          <input
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={e => setFile(e.target.files?.[0] || null)}
+            style={{ width: '100%', color: '#94a3b8', fontSize: 13 }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button
+            onClick={onClose}
+            disabled={loading}
+            style={{ padding: '8px 16px', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleImport}
+            disabled={loading || !file || !name.trim()}
+            style={{ padding: '8px 16px', background: '#0ea5e9', border: 'none', color: '#fff', borderRadius: 6, cursor: loading ? 'wait' : 'pointer', fontWeight: 500 }}
+          >
+            {loading ? 'Importing...' : 'Import Event'}
           </button>
         </div>
       </div>

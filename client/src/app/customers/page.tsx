@@ -16,7 +16,7 @@ interface CustomerRecord {
   originalId: string;
   datasetId?: string;
   datasetName?: string;
-  source: 'leads' | 'calls' | 'intec' | 'tss';
+  source: 'leads' | 'calls' | 'events' | 'tss';
   name: string;
   company: string;
   email: string;
@@ -29,7 +29,7 @@ interface CustomerRecord {
 const SOURCE_BADGES: Record<string, { bg: string; color: string; label: string }> = {
   leads: { bg: '#e0f2fe', color: '#0369a1', label: 'Lead' },
   calls: { bg: '#dcfce7', color: '#15803d', label: 'Call' },
-  intec: { bg: '#f3e8ff', color: '#6b21a8', label: 'Intec' },
+  events: { bg: '#f3e8ff', color: '#6b21a8', label: 'Event' },
   tss: { bg: '#ffedd5', color: '#c2410c', label: 'TSS' },
 };
 
@@ -145,8 +145,8 @@ export default function CustomersPage() {
         return `/leads`;
       case 'calls':
         return `/calls`;
-      case 'intec':
-        return `/intec`;
+      case 'events':
+        return item.datasetId ? `/events/${item.datasetId}` : '/events';
       case 'tss':
         return item.datasetId ? `/tss/${item.datasetId}` : '/tss';
       default:
@@ -176,9 +176,9 @@ export default function CustomersPage() {
               <Building2 size={20} />
             </div>
             <div>
-              <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>Active Leads/Intec</div>
+              <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>Active Leads/Events</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>
-                {records.filter(r => r.source === 'leads' || r.source === 'intec').length} <span style={{ fontSize: 12, color: '#64748b', fontWeight: 400 }}>on page</span>
+                {records.filter(r => r.source === 'leads' || r.source === 'events').length} <span style={{ fontSize: 12, color: '#64748b', fontWeight: 400 }}>on page</span>
               </div>
             </div>
           </div>
@@ -240,7 +240,7 @@ export default function CustomersPage() {
                 <option value="">All Sources</option>
                 <option value="leads">Leads</option>
                 <option value="calls">Calls</option>
-                <option value="intec">Intec</option>
+                <option value="events">Events</option>
                 <option value="tss">TSS</option>
               </select>
 
@@ -354,8 +354,8 @@ export default function CustomersPage() {
                               height: 32, 
                               fontSize: 11, 
                               fontWeight: 700, 
-                              background: item.source === 'leads' ? '#e0f2fe' : item.source === 'calls' ? '#dcfce7' : item.source === 'intec' ? '#f3e8ff' : '#ffedd5',
-                              color: item.source === 'leads' ? '#0369a1' : item.source === 'calls' ? '#15803d' : item.source === 'intec' ? '#6b21a8' : '#c2410c'
+                              background: item.source === 'leads' ? '#e0f2fe' : item.source === 'calls' ? '#dcfce7' : item.source === 'events' ? '#f3e8ff' : '#ffedd5',
+                              color: item.source === 'leads' ? '#0369a1' : item.source === 'calls' ? '#15803d' : item.source === 'events' ? '#6b21a8' : '#c2410c'
                             }}>
                               {item.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                             </div>

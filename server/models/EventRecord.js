@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
-const intecSchema = new mongoose.Schema({
+const eventRecordSchema = new mongoose.Schema({
+  datasetId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EventDataset',
+    required: true
+  },
   hallNumber: {
     type: String,
     trim: true
@@ -96,6 +101,6 @@ const intecSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Full text search index
-intecSchema.index({ companyName: 'text', contactPerson: 'text', email: 'text', hallNumber: 'text', stallNumber: 'text' });
+eventRecordSchema.index({ companyName: 'text', contactPerson: 'text', email: 'text', hallNumber: 'text', stallNumber: 'text' });
 
-module.exports = mongoose.model('Intec', intecSchema);
+module.exports = mongoose.model('EventRecord', eventRecordSchema);
