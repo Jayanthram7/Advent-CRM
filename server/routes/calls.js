@@ -136,6 +136,83 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/calls/analytics (must be before /:id)
+router.get('/analytics', async (req, res) => {
+  try {
+    const { range, startDate, endDate } = req.query;
+    const isAgent = req.user.role === 'Agent';
+    const userId = req.user._id;
+    const baseQuery = isAgent ? { assignedTo: userId } : {};
+
+    let start = new Date();
+    let end = new Date();
+    if (range === '7d') { start.setDate(end.getDate() - 7); }
+    else if (range === '1m') { start.setDate(end.getDate() - 30); }
+    else if (range === '3m') { start.setDate(end.getDate() - 90); }
+    else if (range === '1yr') { start.setDate(end.getDate() - 365); }
+    else if (range === 'custom' && startDate && endDate) {
+      start = new Date(startDate + 'T00:00:00.000Z');
+      end = new Date(endDate + 'T23:59:59.999Z');
+    } else { start.setDate(end.getDate() - 30); }
+    if (range !== 'custom') { start.setHours(0, 0, 0, 0); end.setHours(23, 59, 59, 999); }
+
+    const [total, converted, open, followUp, installation] = await Promise.all([
+      Call.countDocuments(baseQuery),
+      Call.countDocuments({ ...baseQuery, isConverted: true }),
+      Call.countDocuments({ ...baseQuery, isConverted: false, labels: 'Open' }),
+      Call.countDocuments({ ...baseQuery, isConverted: false, labels: 'Follow Up' }),
+      Call.countDocuments({ ...baseQuery, installationDate: { $exists: true, $ne: null } }),
+    ]);
+
+    const trendAgg = await Call.aggregate([
+      { $match: { ...(isAgent ? { assignedTo: userId } : {}), createdAt: { $gte: start, $lte: end } } },
+      { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 }, converted: { $sum: { $cond: ['$isConverted', 1, 0] } } } },
+      { $sort: { '_id': 1 } }
+    ]);
+
+    const trendMap = new Map(trendAgg.map(d => [d._id, d]));
+    const trend = [];
+    let cur = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+    const endUTC = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+    while (cur <= endUTC && trend.length < 1826) {
+      const ds = cur.toISOString().split('T')[0];
+      const d = trendMap.get(ds) || {};
+      trend.push({ date: ds, count: d.count || 0, converted: d.converted || 0 });
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+
+    const labelAgg = await Call.aggregate([
+      { $match: baseQuery }, { $unwind: '$labels' },
+      { $group: { _id: '$labels', count: { $sum: 1 } } }, { $sort: { count: -1 } }
+    ]);
+
+    const sourceAgg = await Call.aggregate([
+      { $match: baseQuery },
+      { $group: { _id: '$leadSource', count: { $sum: 1 } } }, { $sort: { count: -1 } }
+    ]);
+
+    const assignAgg = await Call.aggregate([
+      { $match: { ...baseQuery, assignedTo: { $exists: true, $ne: null } } },
+      { $group: { _id: '$assignedTo', count: { $sum: 1 } } },
+      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      { $project: { name: { $ifNull: ['$user.name', 'Unassigned'] }, count: 1 } },
+      { $sort: { count: -1 } }
+    ]);
+
+    res.json({
+      stats: { total, converted, open, followUp, installation, conversionRate: total > 0 ? ((converted / total) * 100).toFixed(1) : '0' },
+      trend,
+      labels: labelAgg.map(d => ({ name: d._id || 'None', count: d.count })),
+      sources: sourceAgg.map(d => ({ name: d._id || 'Other', count: d.count })),
+      assignments: assignAgg.map(d => ({ name: d.name, count: d.count })),
+    });
+  } catch (err) {
+    console.error('Calls analytics error:', err);
+    res.status(500).json({ message: 'Error fetching calls analytics' });
+  }
+});
+
 // GET /api/calls/:id - get a single call
 router.get('/:id', async (req, res) => {
   try {

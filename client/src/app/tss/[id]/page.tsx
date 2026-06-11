@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, X, FileText, Search, Database, MoreVertical,
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
+import AnalyticsModalComponent from '@/components/AnalyticsModal';
 
 const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review'];
 const LABEL_CLASSES: Record<string, string> = {
@@ -459,43 +460,6 @@ function EditTssRecordModal({ record, onClose, onUpdated }: { record: TssRecord;
   );
 }
 
-// ─── Analytics Modal ──────────────────────────────────────────────────────────
-function AnalyticsModal({ datasetId, onClose }: { datasetId: string; onClose: () => void }) {
-  const [data, setData] = useState<{ name: string; value: number; fill: string }[]>([]);
-
-  useEffect(() => {
-    api.get(`/tss/datasets/${datasetId}/analytics`).then(r => setData(r.data));
-  }, [datasetId]);
-
-  return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 500 }}>
-        <div className="modal-header">
-          <h2 className="modal-title">Dataset Analytics</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
-        </div>
-        <div className="modal-body" style={{ padding: '24px' }}>
-          {data.length > 0 ? (
-            <div style={{ height: 300, width: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={data} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
-                    {data.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>Loading analytics...</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function TssDatasetPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -781,7 +745,7 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
       </div>
       
       {selectedRecord && <RecordDrawer record={selectedRecord} defaultTab={drawerTab} onClose={() => setSelectedRecord(null)} onRefresh={() => fetchRecords()} />}
-      {showAnalytics && <AnalyticsModal datasetId={id} onClose={() => setShowAnalytics(false)} />}
+      {showAnalytics && <AnalyticsModalComponent section="tss" datasetId={id} onClose={() => setShowAnalytics(false)} />}
     </ProtectedLayout>
   );
 }

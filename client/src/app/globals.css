@@ -686,3 +686,28 @@ input[type="checkbox"] {
 .main-layout.collapsed .filter-panel {
   left: 64px !important;
 }
+
+/* Analytics page container layout */
+.analytics-page {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  left: 240px;
+  z-index: 40;
+  background: #f0f2f7;
+  display: flex;
+  flex-direction: column;
+  transition: left 0.3s ease;
+}
+
+.analytics-page.collapsed {
+  left: 64px;
+}
+
+@media (max-width: 768px) {
+  .analytics-page {
+    left: 0 !important;
+  }
+}
+

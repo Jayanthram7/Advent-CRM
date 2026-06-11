@@ -10,8 +10,9 @@ import {
   ChevronUp, ChevronDown, MoreVertical, Tag, Calendar,
   CheckCircle, FileText, Trash2, X, Phone, Mail,
   MapPin, Building2, Hash, Globe, User, Clock, StickyNote, MessageCircle,
-  AlertCircle, Upload, Download, Edit
+  AlertCircle, Upload, Download, Edit, BarChart2
 } from 'lucide-react';
+import AnalyticsModal from '@/components/AnalyticsModal';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 
@@ -1288,6 +1289,7 @@ function EventPageContent({ id }: { id: string }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [viewFilter, setViewFilter] = useState(urlView || '');
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   useEffect(() => {
     api.get('/users').then(r => setUsers(r.data)).catch(() => { });
@@ -1451,6 +1453,13 @@ function EventPageContent({ id }: { id: string }) {
             <button className="btn-primary" onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Plus size={14} /> Add Lead
             </button>
+            <button
+              className="btn-secondary"
+              onClick={() => setShowAnalytics(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'linear-gradient(135deg, #fefce8, #fef9c3)', color: '#b45309', border: '1px solid #fde68a', fontWeight: 600 }}
+            >
+              <BarChart2 size={14} /> Analytics
+            </button>
             {isAdmin && (
               <button
                 onClick={async () => {
@@ -1497,6 +1506,9 @@ function EventPageContent({ id }: { id: string }) {
             )}
           </div>
         </TopBar>
+        {showAnalytics && (
+          <AnalyticsModal section="events" datasetId={id} datasetName={datasetName} onClose={() => setShowAnalytics(false)} />
+        )}
 
         {/* Filters Panel */}
         {showFilter && (

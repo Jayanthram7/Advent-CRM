@@ -10,8 +10,9 @@ import {
   ChevronUp, ChevronDown, MoreVertical, Tag, Calendar,
   CheckCircle, FileText, Trash2, X, Phone, Mail,
   MapPin, Building2, Hash, Globe, User, Clock, StickyNote, MessageCircle,
-  AlertCircle, Edit
+  AlertCircle, Edit, BarChart2
 } from 'lucide-react';
+import AnalyticsModal from '@/components/AnalyticsModal';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 
@@ -1304,6 +1305,7 @@ function LeadsPageContent() {
   const [users, setUsers] = useState<any[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
 
   useEffect(() => {
@@ -1394,9 +1396,19 @@ function LeadsPageContent() {
             </button>
           )}
           <button className="btn-secondary" onClick={() => setShowFilter(!showFilter)}><Filter size={14} />Filter</button>
+          <button
+            className="btn-secondary"
+            onClick={() => setShowAnalytics(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', color: '#1d4ed8', border: '1px solid #bfdbfe', fontWeight: 600 }}
+          >
+            <BarChart2 size={14} /> Analytics
+          </button>
           <button className="btn-primary" onClick={() => setShowCreate(true)}><Plus size={15} />Create Lead</button>
         </div>
       </TopBar>
+      {showAnalytics && (
+        <AnalyticsModal section="leads" onClose={() => setShowAnalytics(false)} />
+      )}
 
       <div style={{ display: 'flex', position: 'relative' }}>
         {/* Filter Panel */}

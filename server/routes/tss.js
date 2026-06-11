@@ -260,24 +260,71 @@ router.delete('/records/:id', async (req, res) => {
 router.get('/datasets/:id/analytics', async (req, res) => {
   try {
     const datasetId = req.params.id;
-    const openCount = await TssRecord.countDocuments({
-      datasetId,
-      status: { $ne: 'Closed' },
-      $or: [
-        { labels: 'Open' },
-        { labels: { $size: 0 } },
-        { labels: { $exists: false } }
-      ]
-    });
-    const followUpCount = await TssRecord.countDocuments({ datasetId, labels: 'Follow Up', status: { $ne: 'Closed' } });
-    const closedCount = await TssRecord.countDocuments({ datasetId, status: 'Closed' });
-    res.json([
-      { name: 'Open', value: openCount, fill: '#3b82f6' },
-      { name: 'Follow Up', value: followUpCount, fill: '#eab308' },
-      { name: 'Closed', value: closedCount, fill: '#22c55e' }
+    const { range, startDate, endDate } = req.query;
+
+    let start = new Date();
+    let end = new Date();
+    if (range === '7d') { start.setDate(end.getDate() - 7); }
+    else if (range === '1m') { start.setDate(end.getDate() - 30); }
+    else if (range === '3m') { start.setDate(end.getDate() - 90); }
+    else if (range === '1yr') { start.setDate(end.getDate() - 365); }
+    else if (range === 'custom' && startDate && endDate) {
+      start = new Date(startDate + 'T00:00:00.000Z');
+      end = new Date(endDate + 'T23:59:59.999Z');
+    } else { start.setDate(end.getDate() - 30); }
+    if (range !== 'custom') { start.setHours(0, 0, 0, 0); end.setHours(23, 59, 59, 999); }
+
+    const baseQuery = { datasetId };
+
+    const [total, closed, open, followUp] = await Promise.all([
+      TssRecord.countDocuments(baseQuery),
+      TssRecord.countDocuments({ ...baseQuery, status: 'Closed' }),
+      TssRecord.countDocuments({ ...baseQuery, status: { $ne: 'Closed' }, $or: [{ labels: 'Open' }, { labels: { $size: 0 } }] }),
+      TssRecord.countDocuments({ ...baseQuery, status: { $ne: 'Closed' }, labels: 'Follow Up' }),
     ]);
-  } catch (err) { res.status(500).json({ message: 'Server error' }); }
+
+    const trendAgg = await TssRecord.aggregate([
+      { $match: { datasetId: require('mongoose').Types.ObjectId.createFromHexString ? require('mongoose').Types.ObjectId.createFromHexString(datasetId) : datasetId, createdAt: { $gte: start, $lte: end } } },
+      { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
+      { $sort: { '_id': 1 } }
+    ]);
+
+    const trendMap = new Map(trendAgg.map(d => [d._id, d.count]));
+    const trend = [];
+    let cur = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+    const endUTC = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+    while (cur <= endUTC && trend.length < 1826) {
+      const ds = cur.toISOString().split('T')[0];
+      trend.push({ date: ds, count: trendMap.get(ds) || 0 });
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+
+    const labelAgg = await TssRecord.aggregate([
+      { $match: baseQuery }, { $unwind: { path: '$labels', preserveNullAndEmptyArrays: false } },
+      { $group: { _id: '$labels', count: { $sum: 1 } } }, { $sort: { count: -1 } }
+    ]);
+
+    const assignAgg = await TssRecord.aggregate([
+      { $match: { ...baseQuery, assignedTo: { $exists: true, $ne: null } } },
+      { $group: { _id: '$assignedTo', count: { $sum: 1 } } },
+      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      { $project: { name: { $ifNull: ['$user.name', 'Unassigned'] }, count: 1 } },
+      { $sort: { count: -1 } }
+    ]);
+
+    res.json({
+      stats: { total, closed, open, followUp },
+      trend,
+      labels: labelAgg.map(d => ({ name: d._id || 'None', count: d.count })),
+      assignments: assignAgg.map(d => ({ name: d.name, count: d.count })),
+    });
+  } catch (err) {
+    console.error('TSS analytics error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
+
 
 // GET /api/tss/settings/credentials
 router.get('/settings/credentials', roleMiddleware('Admin'), async (req, res) => {
