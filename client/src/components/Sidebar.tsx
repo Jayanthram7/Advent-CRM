@@ -589,49 +589,78 @@ function EventImportModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState('');
+  const [importLater, setImportLater] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleImport = async () => {
-    if (!file || !name.trim()) return alert('Name and File are required');
+    if (!name.trim()) return alert('Event Name is required');
+    if (!importLater && !file) return alert('Excel file is required');
     setLoading(true);
 
     try {
-      const XLSX = await import('xlsx');
-      const reader = new FileReader();
-      
-      reader.onload = async (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const records = XLSX.utils.sheet_to_json(firstSheet);
+      if (importLater) {
+        // Create empty event dataset
+        const res = await fetch('/api/events/import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ name, records: [] })
+        });
 
-          const res = await fetch('/api/events/import', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify({ name, records })
-          });
-
-          if (!res.ok) throw new Error('Failed to import');
-          const dataJson = await res.json();
-          onClose();
-          if (dataJson.datasetId) {
-            router.push(`/events/${dataJson.datasetId}`);
-          }
-        } catch (err) {
-          console.error(err);
-          alert('Error parsing or importing Excel file');
-        } finally {
-          setLoading(false);
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.message || 'Failed to create event');
         }
-      };
+        const dataJson = await res.json();
+        onClose();
+        if (dataJson.datasetId) {
+          router.push(`/events/${dataJson.datasetId}`);
+        }
+      } else {
+        // Load and parse Excel file
+        const XLSX = await import('xlsx');
+        const reader = new FileReader();
+        
+        reader.onload = async (e) => {
+          try {
+            const data = new Uint8Array(e.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const records = XLSX.utils.sheet_to_json(firstSheet);
 
-      reader.readAsArrayBuffer(file);
-    } catch (err) {
-      console.error('Error loading xlsx', err);
+            const res = await fetch('/api/events/import', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify({ name, records })
+            });
+
+            if (!res.ok) {
+              const errData = await res.json();
+              throw new Error(errData.message || 'Failed to import');
+            }
+            const dataJson = await res.json();
+            onClose();
+            if (dataJson.datasetId) {
+              router.push(`/events/${dataJson.datasetId}`);
+            }
+          } catch (err: any) {
+            console.error(err);
+            alert(err.message || 'Error parsing or importing Excel file');
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        reader.readAsArrayBuffer(file!);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error creating event dataset');
       setLoading(false);
     }
   };
@@ -660,17 +689,35 @@ function EventImportModal({ onClose }: { onClose: () => void }) {
           />
         </div>
 
-        <div style={{ marginBottom: 24 }}>
-          <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: '#94a3b8' }}>Excel File</label>
+        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
           <input
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={e => setFile(e.target.files?.[0] || null)}
-            style={{ width: '100%', color: '#94a3b8', fontSize: 13 }}
+            type="checkbox"
+            id="importLater"
+            checked={importLater}
+            onChange={e => {
+              setImportLater(e.target.checked);
+              if (e.target.checked) setFile(null);
+            }}
+            style={{ width: 16, height: 16, cursor: 'pointer' }}
           />
+          <label htmlFor="importLater" style={{ fontSize: 13.5, color: '#e2e8f0', cursor: 'pointer', userSelect: 'none' }}>
+            Import Excel Later
+          </label>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+        {!importLater && (
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: '#94a3b8' }}>Excel File</label>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={e => setFile(e.target.files?.[0] || null)}
+              style={{ width: '100%', color: '#94a3b8', fontSize: 13 }}
+            />
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: importLater ? 20 : 0 }}>
           <button
             onClick={onClose}
             disabled={loading}
@@ -680,10 +727,10 @@ function EventImportModal({ onClose }: { onClose: () => void }) {
           </button>
           <button
             onClick={handleImport}
-            disabled={loading || !file || !name.trim()}
+            disabled={loading || !name.trim() || (!importLater && !file)}
             style={{ padding: '8px 16px', background: '#0ea5e9', border: 'none', color: '#fff', borderRadius: 6, cursor: loading ? 'wait' : 'pointer', fontWeight: 500 }}
           >
-            {loading ? 'Importing...' : 'Import Event'}
+            {loading ? 'Creating...' : importLater ? 'Create Event' : 'Import Event'}
           </button>
         </div>
       </div>

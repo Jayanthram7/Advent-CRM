@@ -263,19 +263,20 @@ router.post('/records', async (req, res) => {
   }
 });
 
-// POST /api/events/import - bulk import Event records from parsed Excel
+// POST /api/events/import - bulk import Event records from parsed Excel (or create empty dataset)
 router.post('/import', async (req, res) => {
   try {
     const { name, records } = req.body;
     if (!name) {
       return res.status(400).json({ message: 'Event Name is required' });
     }
-    if (!records || !Array.isArray(records)) {
-      return res.status(400).json({ message: 'Records array is required' });
-    }
 
     // Create Dataset
     const dataset = await EventDataset.create({ name });
+
+    if (!records || !Array.isArray(records) || records.length === 0) {
+      return res.status(201).json({ success: true, datasetId: dataset._id, count: 0 });
+    }
 
     const bulkRecords = records.map(record => {
       const getVal = (possibleKeys) => {
@@ -333,6 +334,77 @@ router.post('/import', async (req, res) => {
     res.status(201).json({ success: true, datasetId: dataset._id, count: inserted.length });
   } catch (err) {
     console.error('Import Event records error:', err);
+    res.status(500).json({ message: 'Server error during Excel import' });
+  }
+});
+
+// POST /api/events/datasets/:id/import - import Excel records into an existing dataset
+router.post('/datasets/:id/import', async (req, res) => {
+  try {
+    const { records } = req.body;
+    if (!records || !Array.isArray(records)) {
+      return res.status(400).json({ message: 'Records array is required' });
+    }
+
+    const dataset = await EventDataset.findById(req.params.id);
+    if (!dataset) {
+      return res.status(404).json({ message: 'Event dataset not found' });
+    }
+
+    const bulkRecords = records.map(record => {
+      const getVal = (possibleKeys) => {
+        let key = Object.keys(record).find(k => 
+          possibleKeys.some(pk => k.toLowerCase().replace(/\s+/g, '') === pk.toLowerCase().replace(/\s+/g, ''))
+        );
+        if (!key) {
+          key = Object.keys(record).find(k => 
+            possibleKeys.some(pk => k.toLowerCase().replace(/[^a-z0-9]/g, '').includes(pk.toLowerCase().replace(/[^a-z0-9]/g, '')) || 
+                                    pk.toLowerCase().replace(/[^a-z0-9]/g, '').includes(k.toLowerCase().replace(/[^a-z0-9]/g, '')))
+          );
+        }
+        return key ? String(record[key]).trim() : '';
+      };
+
+      return {
+        datasetId: dataset._id,
+        hallNumber: getVal(['Hall Number', 'HallNo', 'Hall']),
+        stallNumber: getVal(['Stall Number', 'StallNo', 'Stall']),
+        companyName: getVal(['Company Name', 'Company', 'CompanyName', 'Company_Name']),
+        contactPerson: getVal(['Contact Person', 'ContactPerson', 'Contact', 'Name', 'Contact_Person', 'Person']),
+        position: getVal(['Position', 'Designation', 'Job Title', 'Role']),
+        email: getVal(['Email', 'EmailAddress', 'E-mail', 'Email_Address']),
+        mobile1: getVal(['Mobile 1', 'Mobile1', 'Mobile', 'Phone', 'Contact Number', 'Mobile_1', 'MobileNo', 'Mobile Number']),
+        mobile2: getVal(['Mobile 2', 'Mobile2', 'Phone 2', 'Secondary Phone', 'Mobile_2']),
+        address: getVal(['Address']),
+        country: getVal(['Country']),
+        state: getVal(['State']),
+        pincode: getVal(['Pincode', 'Pin Code', 'Zipcode', 'Zip Code', 'Pin_Code']),
+        website: getVal(['Website', 'Web', 'URL', 'Link', 'Site']),
+        labels: ['Open'],
+        status: 'Open',
+        createdBy: req.user._id,
+        assignedTo: req.user._id
+      };
+    }).filter(r => r.companyName || r.contactPerson);
+
+    if (bulkRecords.length === 0) {
+      return res.status(400).json({ message: 'No valid records with Company Name or Contact Person found' });
+    }
+
+    const inserted = await EventRecord.insertMany(bulkRecords);
+
+    // Create activity logs for imports
+    const activities = inserted.map(item => ({
+      eventRecord: item._id,
+      type: 'Creation',
+      content: `Record imported via Excel by ${req.user.name}`,
+      performedBy: req.user._id
+    }));
+    await Activity.insertMany(activities);
+
+    res.status(201).json({ success: true, count: inserted.length });
+  } catch (err) {
+    console.error('Import into event error:', err);
     res.status(500).json({ message: 'Server error during Excel import' });
   }
 });

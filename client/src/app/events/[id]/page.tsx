@@ -947,6 +947,92 @@ function CreateEventRecordModal({ datasetId, onClose, onCreated }: { datasetId: 
   );
 }
 
+// ─── Import Event Records Modal ──────────────────────────────────────────────
+function ImportEventRecordsModal({ datasetId, onClose, onImported }: { datasetId: string; onClose: () => void; onImported: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleImport = async () => {
+    if (!file) return alert('Excel file is required');
+    setLoading(true);
+
+    try {
+      const XLSX = await import('xlsx');
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const records = XLSX.utils.sheet_to_json(firstSheet);
+
+          const res = await fetch(`/api/events/datasets/${datasetId}/import`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ records })
+          });
+
+          if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.message || 'Failed to import');
+          }
+          toast.success('Records imported successfully!');
+          onImported();
+          onClose();
+        } catch (err: any) {
+          console.error(err);
+          toast.error(err.message || 'Error parsing or importing Excel file');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Error loading xlsx parser');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" style={{ zIndex: 200 }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 400 }}>
+        <div className="modal-header">
+          <h2 className="modal-title">Import Event Excel</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
+        </div>
+        <div className="modal-body">
+          <div style={{ marginBottom: 20 }}>
+            <label className="form-label" style={{ marginBottom: 6 }}>Select Excel File</label>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={e => setFile(e.target.files?.[0] || null)}
+              style={{ width: '100%', color: '#4b5563', fontSize: 13.5 }}
+            />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>Cancel</button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={handleImport}
+            disabled={loading || !file}
+          >
+            {loading ? 'Importing...' : 'Import Data'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Row Actions Menu ────────────────────────────────────────────────────────
 function RowMenu({ record, onRefresh, users }: { record: EventRecord; onRefresh: () => void; users: any[] }) {
   const { isAdmin } = useAuth();
@@ -1190,6 +1276,7 @@ function EventPageContent({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -1352,9 +1439,14 @@ function EventPageContent({ id }: { id: string }) {
             <button className="btn-secondary" onClick={() => setShowFilter(!showFilter)}><Filter size={14} />Filter</button>
 
             {user?.role !== 'Agent' && (
-              <button className="btn-secondary" onClick={handleExportExcel} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Download size={14} /> Export Excel
-              </button>
+              <>
+                <button className="btn-secondary" onClick={() => setShowImport(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Upload size={14} /> Import Excel
+                </button>
+                <button className="btn-secondary" onClick={handleExportExcel} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Download size={14} /> Export Excel
+                </button>
+              </>
             )}
             <button className="btn-primary" onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Plus size={14} /> Add Lead
@@ -1622,6 +1714,14 @@ function EventPageContent({ id }: { id: string }) {
             fetchRecords();
             if (updated) setSelectedRecord(updated);
           }}
+        />
+      )}
+
+      {showImport && (
+        <ImportEventRecordsModal
+          datasetId={id}
+          onClose={() => setShowImport(false)}
+          onImported={fetchRecords}
         />
       )}
     </ProtectedLayout>
