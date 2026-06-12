@@ -1036,7 +1036,7 @@ function ImportEventRecordsModal({ datasetId, onClose, onImported }: { datasetId
 
 // ─── Row Actions Menu ────────────────────────────────────────────────────────
 function RowMenu({ record, onRefresh, users }: { record: EventRecord; onRefresh: () => void; users: any[] }) {
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [submenu, setSubmenu] = useState<'labels' | 'date_followup' | 'date_install' | 'assign' | null>(null);
 
@@ -1136,7 +1136,7 @@ function RowMenu({ record, onRefresh, users }: { record: EventRecord; onRefresh:
               ) : (
                 <div className="dropdown-item" onClick={askReview}><User size={14} />Ask Review</div>
               )}
-              {!record.isConverted && (
+              {!record.isConverted && user?.role !== 'Agent' && (
                 <div className="dropdown-item" onClick={convertRecord}><CheckCircle size={14} />Mark as Converted</div>
               )}
               <div className="dropdown-item" onClick={() => { setOpen(false); setNoteOpen(true); }}><FileText size={14} />Add Note</div>
@@ -1453,13 +1453,15 @@ function EventPageContent({ id }: { id: string }) {
             <button className="btn-primary" onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Plus size={14} /> Add Lead
             </button>
-            <button
-              className="btn-secondary"
-              onClick={() => setShowAnalytics(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'linear-gradient(135deg, #fefce8, #fef9c3)', color: '#b45309', border: '1px solid #fde68a', fontWeight: 600 }}
-            >
-              <BarChart2 size={14} /> Analytics
-            </button>
+            {user?.role !== 'Agent' && (
+              <button
+                className="btn-secondary"
+                onClick={() => setShowAnalytics(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'linear-gradient(135deg, #fefce8, #fef9c3)', color: '#b45309', border: '1px solid #fde68a', fontWeight: 600 }}
+              >
+                <BarChart2 size={14} /> Analytics
+              </button>
+            )}
             {isAdmin && (
               <button
                 onClick={async () => {
@@ -1507,7 +1509,17 @@ function EventPageContent({ id }: { id: string }) {
           </div>
         </TopBar>
         {showAnalytics && (
-          <AnalyticsModal section="events" datasetId={id} datasetName={datasetName} onClose={() => setShowAnalytics(false)} />
+          <AnalyticsModal 
+            section="events" 
+            datasetId={id} 
+            datasetName={datasetName} 
+            onClose={() => setShowAnalytics(false)} 
+            onViewRecord={(name) => {
+              setSearch(name);
+              setPage(1);
+              setShowAnalytics(false);
+            }}
+          />
         )}
 
         {/* Filters Panel */}

@@ -275,6 +275,11 @@ router.get('/datasets/:id/analytics', async (req, res) => {
     if (range !== 'custom') { start.setHours(0, 0, 0, 0); end.setHours(23, 59, 59, 999); }
 
     const baseQuery = { datasetId };
+    const mongoose = require('mongoose');
+    const datasetObjId = mongoose.Types.ObjectId.createFromHexString 
+      ? mongoose.Types.ObjectId.createFromHexString(datasetId) 
+      : new mongoose.Types.ObjectId(datasetId);
+    const aggBaseQuery = { datasetId: datasetObjId };
 
     const [total, closed, open, followUp] = await Promise.all([
       TssRecord.countDocuments(baseQuery),
@@ -284,7 +289,7 @@ router.get('/datasets/:id/analytics', async (req, res) => {
     ]);
 
     const trendAgg = await TssRecord.aggregate([
-      { $match: { datasetId: require('mongoose').Types.ObjectId.createFromHexString ? require('mongoose').Types.ObjectId.createFromHexString(datasetId) : datasetId, createdAt: { $gte: start, $lte: end } } },
+      { $match: { datasetId: datasetObjId, createdAt: { $gte: start, $lte: end } } },
       { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
       { $sort: { '_id': 1 } }
     ]);
@@ -300,12 +305,12 @@ router.get('/datasets/:id/analytics', async (req, res) => {
     }
 
     const labelAgg = await TssRecord.aggregate([
-      { $match: baseQuery }, { $unwind: { path: '$labels', preserveNullAndEmptyArrays: false } },
+      { $match: aggBaseQuery }, { $unwind: { path: '$labels', preserveNullAndEmptyArrays: false } },
       { $group: { _id: '$labels', count: { $sum: 1 } } }, { $sort: { count: -1 } }
     ]);
 
     const assignAgg = await TssRecord.aggregate([
-      { $match: { ...baseQuery, assignedTo: { $exists: true, $ne: null } } },
+      { $match: { ...aggBaseQuery, assignedTo: { $exists: true, $ne: null } } },
       { $group: { _id: '$assignedTo', count: { $sum: 1 } } },
       { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
       { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
@@ -313,15 +318,60 @@ router.get('/datasets/:id/analytics', async (req, res) => {
       { $sort: { count: -1 } }
     ]);
 
+    const followUpStats = await TssRecord.aggregate([
+      { $match: aggBaseQuery },
+      { $project: {
+          followUpsCount: { $size: { $ifNull: ["$notes", []] } }
+      } },
+      { $group: {
+          _id: null,
+          totalFollowUps: { $sum: "$followUpsCount" }
+      } }
+    ]);
+    const totalFollowUps = followUpStats[0]?.totalFollowUps || 0;
+    const followsPerLead = total > 0 ? (totalFollowUps / total).toFixed(2) : '0.00';
+
+    const topFollowedAgg = await TssRecord.aggregate([
+      { $match: aggBaseQuery },
+      { $project: {
+          name: "$customerName",
+          serialNumber: "$serialNumber",
+          followUpsCount: { $size: { $ifNull: ["$notes", []] } }
+      } },
+      { $sort: { followUpsCount: -1, name: 1 } },
+      { $limit: 5 }
+    ]);
+    const topFollowed = topFollowedAgg.map(d => ({
+      id: d._id,
+      name: d.name ? d.name.trim() : (d.serialNumber || 'Unnamed Customer'),
+      count: d.followUpsCount
+    }));
+
+    const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+    const leadsInRange = trendAgg.reduce((s, d) => s + d.count, 0);
+    const avgLeadsPerDay = (leadsInRange / days).toFixed(1);
+
+    const followsAgg = await TssRecord.aggregate([
+      { $match: aggBaseQuery },
+      { $unwind: "$notes" },
+      { $match: { "notes.createdAt": { $gte: start, $lte: end } } },
+      { $group: { _id: null, count: { $sum: 1 } } }
+    ]);
+    const followsInRange = followsAgg[0]?.count || 0;
+    const avgFollowsPerDay = (followsInRange / days).toFixed(1);
+
+    const avgInstallationsPerDay = '0.0';
+
     res.json({
-      stats: { total, closed, open, followUp },
+      stats: { total, closed, open, followUp, totalFollowUps, followsPerLead, avgLeadsPerDay, avgFollowsPerDay, avgInstallationsPerDay },
       trend,
       labels: labelAgg.map(d => ({ name: d._id || 'None', count: d.count })),
       assignments: assignAgg.map(d => ({ name: d.name, count: d.count })),
+      topFollowed
     });
   } catch (err) {
     console.error('TSS analytics error:', err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Error fetching tss analytics' });
   }
 });
 

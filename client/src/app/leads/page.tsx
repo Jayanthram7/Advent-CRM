@@ -1272,7 +1272,7 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
 
 // ─── Main Leads Page ──────────────────────────────────────────────────────────
 function LeadsPageContent() {
-  const { isAdmin, sidebarCollapsed } = useAuth();
+  const { user, isAdmin, sidebarCollapsed } = useAuth();
   const searchParams = useSearchParams();
   const urlView = searchParams.get('view'); // open | followup | dateset | installation | completed
   const [viewFilter, setViewFilter] = useState(urlView || '');
@@ -1396,18 +1396,28 @@ function LeadsPageContent() {
             </button>
           )}
           <button className="btn-secondary" onClick={() => setShowFilter(!showFilter)}><Filter size={14} />Filter</button>
-          <button
-            className="btn-secondary"
-            onClick={() => setShowAnalytics(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', color: '#1d4ed8', border: '1px solid #bfdbfe', fontWeight: 600 }}
-          >
-            <BarChart2 size={14} /> Analytics
-          </button>
+          {user?.role !== 'Agent' && (
+            <button
+              className="btn-secondary"
+              onClick={() => setShowAnalytics(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', color: '#1d4ed8', border: '1px solid #bfdbfe', fontWeight: 600 }}
+            >
+              <BarChart2 size={14} /> Analytics
+            </button>
+          )}
           <button className="btn-primary" onClick={() => setShowCreate(true)}><Plus size={15} />Create Lead</button>
         </div>
       </TopBar>
       {showAnalytics && (
-        <AnalyticsModal section="leads" onClose={() => setShowAnalytics(false)} />
+        <AnalyticsModal 
+          section="leads" 
+          onClose={() => setShowAnalytics(false)} 
+          onViewRecord={(name) => {
+            setSearch(name);
+            setPage(1);
+            setShowAnalytics(false);
+          }}
+        />
       )}
 
       <div style={{ display: 'flex', position: 'relative' }}>

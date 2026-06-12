@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
-import { X, TrendingUp, Users, CheckCircle, Clock, BarChart2, RefreshCw } from 'lucide-react';
+import { X, TrendingUp, Users, CheckCircle, Clock, BarChart2, RefreshCw, MessageSquare, Flame, Video } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -23,11 +23,17 @@ interface AnalyticsData {
     installation?: number;
     closed?: number;
     conversionRate?: string;
+    totalFollowUps?: number;
+    followsPerLead?: string;
+    avgLeadsPerDay?: string;
+    avgFollowsPerDay?: string;
+    avgInstallationsPerDay?: string;
   };
   trend: { date: string; count: number; converted?: number }[];
   labels: { name: string; count: number }[];
   sources?: { name: string; count: number }[];
   assignments: { name: string; count: number }[];
+  topFollowed?: { id: string; name: string; count: number }[];
 }
 
 interface Props {
@@ -35,6 +41,7 @@ interface Props {
   datasetId?: string;
   datasetName?: string;
   onClose: () => void;
+  onViewRecord?: (name: string) => void;
 }
 
 const SECTION_CONFIG: Record<Section, { title: string; apiPath: (id?: string) => string; color: string; gradient: string; primaryLabel: string }> = {
@@ -98,7 +105,7 @@ function StatCard({ icon: Icon, label, value, sub, color, accent }: {
   );
 }
 
-export default function AnalyticsModal({ section, datasetId, datasetName, onClose }: Props) {
+export default function AnalyticsModal({ section, datasetId, datasetName, onClose, onViewRecord }: Props) {
   const { sidebarCollapsed } = useAuth();
   const cfg = SECTION_CONFIG[section];
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -139,6 +146,7 @@ export default function AnalyticsModal({ section, datasetId, datasetName, onClos
   const labels = data?.labels || [];
   const sources = data?.sources || [];
   const assignments = data?.assignments || [];
+  const topFollowed = data?.topFollowed || [];
   const totalLabels = labels.reduce((s, l) => s + l.count, 0);
 
   return (
@@ -251,24 +259,113 @@ export default function AnalyticsModal({ section, datasetId, datasetName, onClos
         ) : (
           <div style={{ maxWidth: 1600, margin: '0 auto' }}>
 
-            {/* Stat Cards Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
-              <StatCard icon={Users} label={cfg.primaryLabel} value={stats?.total ?? 0} color={cfg.color} accent={cfg.gradient.includes('gradient') ? undefined : cfg.color} />
-              {stats?.converted !== undefined && (
-                <StatCard icon={CheckCircle} label="Converted" value={stats.converted} sub={`${stats.conversionRate}% rate`} color="#10b981" />
-              )}
-              {stats?.open !== undefined && (
-                <StatCard icon={TrendingUp} label="Open" value={stats.open} color="#6366f1" />
-              )}
-              {stats?.followUp !== undefined && (
-                <StatCard icon={Clock} label="Follow Up" value={stats.followUp} color="#f59e0b" />
-              )}
-              {stats?.installation !== undefined && (
-                <StatCard icon={CheckCircle} label="Installation" value={stats.installation} color="#06b6d4" />
-              )}
-              {stats?.closed !== undefined && (
-                <StatCard icon={CheckCircle} label="Closed" value={stats.closed} color="#10b981" />
-              )}
+            {/* Consolidated 2-Card Metric Overview */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20, marginBottom: 24 }}>
+              {/* Card 1: Record Status */}
+              <div style={{
+                background: 'white',
+                borderRadius: 16,
+                border: '1px solid #e2e8f0',
+                padding: '14px 20px',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 2px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Users size={16} color={cfg.color} /> Status Overview
+                </h3>
+                
+                {/* Line 1: Total */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 6, borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>Total {section === 'leads' ? 'Leads' : section === 'calls' ? 'Calls' : section === 'events' ? 'Event Records' : 'TSS Records'}</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>{stats?.total ?? 0}</span>
+                </div>
+
+                {/* Line 2: Open */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 6, borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>Open</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: '#6366f1' }}>{stats?.open ?? 0}</span>
+                </div>
+
+                {/* Line 3: In Follow Up */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 6, borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>In Follow Up</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b' }}>{stats?.followUp ?? 0}</span>
+                </div>
+
+                {/* Line 4: Installation */}
+                {stats?.installation !== undefined && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 6, borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>Installation</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: '#06b6d4' }}>{stats.installation}</span>
+                  </div>
+                )}
+
+                {/* Line 5: Closed / Converted */}
+                {stats?.closed !== undefined ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>Closed</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: '#10b981' }}>{stats.closed}</span>
+                  </div>
+                ) : stats?.converted !== undefined ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>Converted</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: '#10b981' }}>
+                      {stats.converted} <span style={{ fontSize: 11, fontWeight: 500, color: '#94a3b8', marginLeft: 4 }}>({stats.conversionRate}% rate)</span>
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Card 2: Performance Averages */}
+              <div style={{
+                background: 'white',
+                borderRadius: 16,
+                border: '1px solid #e2e8f0',
+                padding: '14px 20px',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 2px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <MessageSquare size={16} color="#8b5cf6" /> Performance Averages
+                </h3>
+
+                {/* Follows Per Lead */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 6, borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>Follows / Lead (Avg)</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: '#8b5cf6' }}>
+                    {stats?.followsPerLead ?? '0.00'}
+                    {stats?.totalFollowUps !== undefined && (
+                      <span style={{ fontSize: 11, fontWeight: 500, color: '#94a3b8', marginLeft: 6 }}>({stats.totalFollowUps} total)</span>
+                    )}
+                  </span>
+                </div>
+
+                {/* Avg Leads Per Day */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 6, borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>
+                    Avg {section === 'leads' ? 'Leads' : section === 'calls' ? 'Calls' : 'Records'} / Day
+                  </span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>{stats?.avgLeadsPerDay ?? '0.0'}</span>
+                </div>
+
+                {/* Avg Follows Per Day */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 6, borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>Avg Follows / Day</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b' }}>{stats?.avgFollowsPerDay ?? '0.0'}</span>
+                </div>
+
+                {/* Avg Installations Per Day */}
+                {section !== 'tss' && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>Avg Installations / Day</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: '#06b6d4' }}>{stats?.avgInstallationsPerDay ?? '0.0'}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Main Trend Chart — Full Width */}
@@ -328,10 +425,10 @@ export default function AnalyticsModal({ section, datasetId, datasetName, onClos
               )}
             </div>
 
-            {/* Bottom Row — 3 or 2 columns */}
+            {/* Bottom Row — Responsive Grid */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: sources.length > 0 ? '1fr 1fr 1fr' : '1fr 1fr',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
               gap: 20
             }}>
               {/* Label Distribution */}
@@ -393,6 +490,48 @@ export default function AnalyticsModal({ section, datasetId, datasetName, onClos
                   </div>
                 </div>
               )}
+
+              {/* Top 5 Most Followed */}
+              <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', padding: '24px 28px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 20 }}>Top 5 Most Followed</h3>
+                {topFollowed.length === 0 ? (
+                  <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 13, textAlign: 'center' }}>
+                    No follow-ups found
+                  </div>
+                ) : (
+                  <div>
+                    {topFollowed.map((d, i) => {
+                      const maxCount = topFollowed[0]?.count || 1;
+                      const pct = maxCount > 0 ? ((d.count / maxCount) * 100).toFixed(0) : 0;
+                      return (
+                        <div key={d.id || i} style={{ marginBottom: 14 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+                              <div style={{
+                                width: 28, height: 28, borderRadius: '50%',
+                                background: '#3b82f620',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 12, fontWeight: 700, color: '#3b82f6', flexShrink: 0
+                              }}>
+                                #{i + 1}
+                              </div>
+                              <span style={{ fontSize: 13, color: '#374151', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.name}>
+                                {d.name}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', flexShrink: 0, marginLeft: 8 }}>
+                              {d.count} {d.count === 1 ? 'follow' : 'follows'}
+                            </span>
+                          </div>
+                          <div style={{ height: 6, borderRadius: 4, background: '#f1f5f9', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${pct}%`, background: '#3b82f6', borderRadius: 4, transition: 'width 0.6s ease' }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
               {/* Agent Workload */}
               <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', padding: '24px 28px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>

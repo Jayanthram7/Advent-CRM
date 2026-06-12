@@ -200,12 +200,67 @@ router.get('/analytics', async (req, res) => {
       { $sort: { count: -1 } }
     ]);
 
+    const followUpStats = await Call.aggregate([
+      { $match: baseQuery },
+      { $project: {
+          followUpsCount: { $size: { $ifNull: ["$followUpHistory", []] } }
+      } },
+      { $group: {
+          _id: null,
+          totalFollowUps: { $sum: "$followUpsCount" }
+      } }
+    ]);
+    const totalFollowUps = followUpStats[0]?.totalFollowUps || 0;
+    const followsPerLead = total > 0 ? (totalFollowUps / total).toFixed(2) : '0.00';
+
+    const topFollowedAgg = await Call.aggregate([
+      { $match: baseQuery },
+      { $project: {
+          name: { $concat: ["$firstName", " ", "$lastName"] },
+          company: "$company",
+          phone: "$phone",
+          followUpsCount: { $size: { $ifNull: ["$followUpHistory", []] } }
+      } },
+      { $sort: { followUpsCount: -1, name: 1 } },
+      { $limit: 5 }
+    ]);
+    const topFollowed = topFollowedAgg.map(d => ({
+      id: d._id,
+      name: d.name ? d.name.trim() : (d.company || d.phone || 'Unnamed Call'),
+      count: d.followUpsCount
+    }));
+
+    const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+    const leadsInRange = trendAgg.reduce((s, d) => s + d.count, 0);
+    const avgLeadsPerDay = (leadsInRange / days).toFixed(1);
+
+    const followsAgg = await Call.aggregate([
+      { $match: baseQuery },
+      { $unwind: "$followUpHistory" },
+      { $match: { "followUpHistory.createdAt": { $gte: start, $lte: end } } },
+      { $group: { _id: null, count: { $sum: 1 } } }
+    ]);
+    const followsInRange = followsAgg[0]?.count || 0;
+    const avgFollowsPerDay = (followsInRange / days).toFixed(1);
+
+    const installationsInRange = await Call.countDocuments({
+      ...baseQuery,
+      installationDate: { $gte: start, $lte: end }
+    });
+    const avgInstallationsPerDay = (installationsInRange / days).toFixed(1);
+
     res.json({
-      stats: { total, converted, open, followUp, installation, conversionRate: total > 0 ? ((converted / total) * 100).toFixed(1) : '0' },
+      stats: { 
+        total, converted, open, followUp, installation, 
+        conversionRate: total > 0 ? ((converted / total) * 100).toFixed(1) : '0', 
+        totalFollowUps, followsPerLead,
+        avgLeadsPerDay, avgFollowsPerDay, avgInstallationsPerDay
+      },
       trend,
       labels: labelAgg.map(d => ({ name: d._id || 'None', count: d.count })),
       sources: sourceAgg.map(d => ({ name: d._id || 'Other', count: d.count })),
       assignments: assignAgg.map(d => ({ name: d.name, count: d.count })),
+      topFollowed
     });
   } catch (err) {
     console.error('Calls analytics error:', err);

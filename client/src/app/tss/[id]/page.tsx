@@ -637,12 +637,14 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
               <RefreshCw size={15} /> Refresh & Untick
             </button>
 
-            <button
-              onClick={() => setShowAnalytics(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
-            >
-              <BarChart3 size={15} /> Analytics
-            </button>
+            {user?.role !== 'Agent' && (
+              <button
+                onClick={() => setShowAnalytics(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+              >
+                <BarChart3 size={15} /> Analytics
+              </button>
+            )}
           </div>
         </div>
 
@@ -745,7 +747,18 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
       </div>
       
       {selectedRecord && <RecordDrawer record={selectedRecord} defaultTab={drawerTab} onClose={() => setSelectedRecord(null)} onRefresh={() => fetchRecords()} />}
-      {showAnalytics && <AnalyticsModalComponent section="tss" datasetId={id} onClose={() => setShowAnalytics(false)} />}
+      {showAnalytics && (
+        <AnalyticsModalComponent 
+          section="tss" 
+          datasetId={id} 
+          onClose={() => setShowAnalytics(false)} 
+          onViewRecord={(name) => {
+            setSearch(name);
+            setPage(1);
+            setShowAnalytics(false);
+          }}
+        />
+      )}
     </ProtectedLayout>
   );
 }
