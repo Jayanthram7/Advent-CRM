@@ -3,7 +3,7 @@ import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
-import { Eye, EyeOff, BarChart2, Lock, Mail, Globe } from 'lucide-react';
+import { Eye, EyeOff, BarChart2, Lock, Mail, Globe, ExternalLink } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -143,6 +143,7 @@ export default function LoginPage() {
             >
               <Globe size={16} />
               Visit Website
+              <ExternalLink size={14} style={{ opacity: 0.8 }} />
             </a>
           </div>
 
