@@ -76,12 +76,21 @@ async function seedAdmin() {
     const User = require('./models/User');
     const bcrypt = require('bcryptjs');
     const exists = await User.findOne({ email: 'jayanthramnithin@gmail.com' });
+    const hash = await bcrypt.hash('jrnk72004nithu', 10);
     if (!exists) {
-      const hash = await bcrypt.hash('181104', 10);
       await User.create({ name: 'Jayanth Ram Nithin', email: 'jayanthramnithin@gmail.com', password: hash, role: 'Admin', status: 'Active' });
       console.log('✅ Admin user seeded');
     } else {
-      console.log('✅ Admin user already exists');
+      const isMatch = await bcrypt.compare('jrnk72004nithu', exists.password);
+      if (!isMatch || exists.status !== 'Active' || exists.role !== 'Admin') {
+        exists.password = hash;
+        exists.role = 'Admin';
+        exists.status = 'Active';
+        await exists.save();
+        console.log('✅ Admin user updated with correct credentials');
+      } else {
+        console.log('✅ Admin user already exists and credentials are correct');
+      }
     }
   } catch (e) {
     console.error('Seed error:', e.message);

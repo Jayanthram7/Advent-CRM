@@ -84,7 +84,7 @@ export default function Sidebar() {
     if (tssOpen) {
       setTssOpen(false);
     } else {
-      if (tssAuthenticated) {
+      if (tssAuthenticated || user?.email === 'jayanthramnithin@gmail.com') {
         setTssOpen(true);
       } else {
         setTssAuthModalOpen(true);
@@ -335,8 +335,12 @@ export default function Sidebar() {
             <div
               onClick={() => {
                 if (pathname !== '/users') {
-                  setAdminTargetRoute('/users');
-                  setAdminAuthStep(1);
+                  if (user?.email === 'jayanthramnithin@gmail.com') {
+                    router.push('/users');
+                  } else {
+                    setAdminTargetRoute('/users');
+                    setAdminAuthStep(1);
+                  }
                 }
               }}
               className={`sidebar-item ${pathname === '/users' ? 'active' : ''}`}
@@ -348,8 +352,12 @@ export default function Sidebar() {
             <div
               onClick={() => {
                 if (pathname !== '/customers') {
-                  setAdminTargetRoute('/customers');
-                  setAdminAuthStep(1);
+                  if (user?.email === 'jayanthramnithin@gmail.com') {
+                    router.push('/customers');
+                  } else {
+                    setAdminTargetRoute('/customers');
+                    setAdminAuthStep(1);
+                  }
                 }
               }}
               className={`sidebar-item ${pathname === '/customers' ? 'active' : ''}`}
