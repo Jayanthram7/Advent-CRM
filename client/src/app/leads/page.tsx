@@ -16,7 +16,7 @@ import AnalyticsModal from '@/components/AnalyticsModal';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 
-const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review'];
+const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Completed', 'Closed'];
 const SOURCE_OPTIONS = ['Website', 'Cold Call', 'Referral', 'Social Media', 'Email Campaign', 'Walk-in', 'Other'];
 
 const LABEL_CLASSES: Record<string, string> = {
@@ -28,6 +28,8 @@ const LABEL_CLASSES: Record<string, string> = {
   'Hot Lead': 'badge badge-hot-lead',
   'Cold Lead': 'badge badge-cold-lead',
   'Review': 'badge badge-review',
+  'Completed': 'badge badge-completed',
+  'Closed': 'badge badge-closed',
 };
 
 export interface Lead {
@@ -243,8 +245,6 @@ export function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }:
                   {lead.firstName} {lead.lastName}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                  {lead.isConverted && <span className="badge badge-converted" style={{ fontSize: 11 }}>Converted</span>}
-                  {lead.status && !lead.isConverted && <span className="badge badge-open" style={{ fontSize: 11 }}>{lead.status}</span>}
                   {(lead.labels || []).map(l => (
                     <span key={l} className={LABEL_CLASSES[l] || 'badge'} style={{ fontSize: 11 }}>{l}</span>
                   ))}
@@ -1166,7 +1166,7 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
                 <div className="dropdown-item" onClick={askReview}><User size={14} />Ask Review</div>
               )}
               {!lead.isConverted && isAdmin && (
-                <div className="dropdown-item" onClick={convertLead}><CheckCircle size={14} />Mark as Converted</div>
+                <div className="dropdown-item" onClick={convertLead}><CheckCircle size={14} />Mark as Completed</div>
               )}
               <div className="dropdown-item" onClick={() => { setSubmenu('note'); setOpen(false); setNoteOpen(true); }}><FileText size={14} />Add Note</div>
               {isAdmin && (
@@ -1181,7 +1181,7 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
           {submenu === 'labels' && (
             <div style={{ padding: 10 }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>SELECT LABELS</p>
-              {LABEL_OPTIONS.map(lbl => (
+              {LABEL_OPTIONS.filter(lbl => isAdmin || (lbl !== 'Completed' && lbl !== 'Closed')).map(lbl => (
                 <label key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer', fontSize: 13 }}>
                   <input type="radio" checked={selectedLabels.includes(lbl)}
                     onChange={() => setSelectedLabels([lbl])} />
@@ -1305,8 +1305,16 @@ function LeadsPageContent() {
   const [users, setUsers] = useState<any[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [reviewCount, setReviewCount] = useState(0);
   const [showAnalytics, setShowAnalytics] = useState(false);
 
+  useEffect(() => {
+    if (isAdmin) {
+      api.get('/leads', { params: { limit: '1', label: 'Review' } })
+        .then(res => setReviewCount(res.data.total))
+        .catch(err => console.error(err));
+    }
+  }, [isAdmin, leads]);
 
   useEffect(() => {
     api.get('/users').then(r => setUsers(r.data)).catch(() => {});
@@ -1384,6 +1392,7 @@ function LeadsPageContent() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
+                position: 'relative',
                 ...(filterLabel === 'Review' ? {
                   background: '#fee2e2',
                   color: '#b91c1c',
@@ -1393,6 +1402,28 @@ function LeadsPageContent() {
             >
               <AlertCircle size={14} style={filterLabel === 'Review' ? { color: '#b91c1c' } : {}} />
               Needs Review
+              {reviewCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-6px',
+                  right: '-6px',
+                  background: '#ef4444',
+                  color: 'white',
+                  borderRadius: '50%',
+                  minWidth: '18px',
+                  height: '18px',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 4px',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                  zIndex: 10
+                }}>
+                  {reviewCount}
+                </span>
+              )}
             </button>
           )}
           <button className="btn-secondary" onClick={() => setShowFilter(!showFilter)}><Filter size={14} />Filter</button>
@@ -1558,13 +1589,9 @@ function LeadsPageContent() {
                         <td>{lead.licenseNumber || '—'}</td>
                         <td>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            {lead.isConverted ? (
-                              <span className="badge badge-converted">Converted</span>
-                            ) : (
-                              (lead.labels || []).map(l => (
-                                <span key={l} className={LABEL_CLASSES[l] || 'badge'}>{l}</span>
-                              ))
-                            )}
+                            {(lead.labels || []).map(l => (
+                              <span key={l} className={LABEL_CLASSES[l] || 'badge'}>{l}</span>
+                            ))}
                           </div>
                         </td>
                         <td>

@@ -16,7 +16,7 @@ import AnalyticsModal from '@/components/AnalyticsModal';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 
-const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review'];
+const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Completed', 'Closed'];
 
 const LABEL_CLASSES: Record<string, string> = {
   'Open': 'badge badge-open',
@@ -27,6 +27,8 @@ const LABEL_CLASSES: Record<string, string> = {
   'Hot Lead': 'badge badge-hot-call',
   'Cold Lead': 'badge badge-cold-call',
   'Review': 'badge badge-review',
+  'Completed': 'badge badge-completed',
+  'Closed': 'badge badge-closed',
 };
 
 export interface EventRecord {
@@ -241,8 +243,6 @@ export function EventDrawer({ record, defaultTab = 'details', onClose, onRefresh
                   {record.contactPerson || 'Unknown Contact'}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                  {record.isConverted && <span className="badge badge-converted" style={{ fontSize: 11 }}>Converted</span>}
-                  {record.status && !record.isConverted && <span className="badge badge-open" style={{ fontSize: 11 }}>{record.status}</span>}
                   {(record.labels || []).map(l => (
                     <span key={l} className={LABEL_CLASSES[l] || 'badge'} style={{ fontSize: 11 }}>{l}</span>
                   ))}
@@ -1136,8 +1136,8 @@ function RowMenu({ record, onRefresh, users }: { record: EventRecord; onRefresh:
               ) : (
                 <div className="dropdown-item" onClick={askReview}><User size={14} />Ask Review</div>
               )}
-              {!record.isConverted && user?.role !== 'Agent' && (
-                <div className="dropdown-item" onClick={convertRecord}><CheckCircle size={14} />Mark as Converted</div>
+              {!record.isConverted && isAdmin && (
+                <div className="dropdown-item" onClick={convertRecord}><CheckCircle size={14} />Mark as Completed</div>
               )}
               <div className="dropdown-item" onClick={() => { setOpen(false); setNoteOpen(true); }}><FileText size={14} />Add Note</div>
               {isAdmin && (
@@ -1152,7 +1152,7 @@ function RowMenu({ record, onRefresh, users }: { record: EventRecord; onRefresh:
           {submenu === 'labels' && (
             <div style={{ padding: 10 }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>SELECT LABELS</p>
-              {LABEL_OPTIONS.map(lbl => (
+              {LABEL_OPTIONS.filter(lbl => isAdmin || (lbl !== 'Completed' && lbl !== 'Closed')).map(lbl => (
                 <label key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer', fontSize: 13 }}>
                   <input type="radio" checked={selectedLabels.includes(lbl)}
                     onChange={() => setSelectedLabels([lbl])} />
@@ -1290,6 +1290,15 @@ function EventPageContent({ id }: { id: string }) {
   const [endDate, setEndDate] = useState('');
   const [viewFilter, setViewFilter] = useState(urlView || '');
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [reviewCount, setReviewCount] = useState(0);
+
+  useEffect(() => {
+    if (isAdmin && id) {
+      api.get(`/events/datasets/${id}/records`, { params: { limit: '1', label: 'Review' } })
+        .then(res => setReviewCount(res.data.total))
+        .catch(err => console.error(err));
+    }
+  }, [isAdmin, id, records]);
 
   useEffect(() => {
     api.get('/users').then(r => setUsers(r.data)).catch(() => { });
@@ -1431,11 +1440,34 @@ function EventPageContent({ id }: { id: string }) {
                 }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
+                  position: 'relative',
                   ...(filterLabel === 'Review' ? { background: '#fee2e2', color: '#b91c1c', borderColor: '#fca5a5' } : {})
                 }}
               >
                 <AlertCircle size={14} style={filterLabel === 'Review' ? { color: '#b91c1c' } : {}} />
                 Needs Review
+                {reviewCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-6px',
+                    right: '-6px',
+                    background: '#ef4444',
+                    color: 'white',
+                    borderRadius: '50%',
+                    minWidth: '18px',
+                    height: '18px',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 4px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                    zIndex: 10
+                  }}>
+                    {reviewCount}
+                  </span>
+                )}
               </button>
             )}
             <button className="btn-secondary" onClick={() => setShowFilter(!showFilter)}><Filter size={14} />Filter</button>
@@ -1662,9 +1694,8 @@ function EventPageContent({ id }: { id: string }) {
                         <td style={{ padding: '12px 12px', color: '#475569', fontSize: 13, maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.email}>{r.email || '-'}</td>
                         <td style={{ padding: '12px 12px' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {r.isConverted && <span className="badge badge-converted" style={{ fontSize: 10 }}>Converted</span>}
-                            {!r.isConverted && (r.labels || []).slice(0, 2).map(l => <span key={l} className={LABEL_CLASSES[l] || 'badge'} style={{ fontSize: 10 }}>{l}</span>)}
-                            {!r.isConverted && (r.labels?.length || 0) > 2 && <span className="badge" style={{ fontSize: 10 }}>+{(r.labels?.length || 0) - 2}</span>}
+                            {(r.labels || []).slice(0, 2).map(l => <span key={l} className={LABEL_CLASSES[l] || 'badge'} style={{ fontSize: 10 }}>{l}</span>)}
+                            {(r.labels?.length || 0) > 2 && <span className="badge" style={{ fontSize: 10 }}>+{(r.labels?.length || 0) - 2}</span>}
                           </div>
                         </td>
                         <td style={{ padding: '12px 12px' }}>

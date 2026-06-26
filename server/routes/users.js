@@ -55,7 +55,7 @@ router.get('/tasks', async (req, res) => {
     const query = {};
     if (targetUserId) {
       query.assignedTo = targetUserId;
-    } else {
+    } else if (!(req.user.role === 'Admin' && label === 'Review')) {
       query.assignedTo = { $ne: null };
     }
 

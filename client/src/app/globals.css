@@ -336,6 +336,8 @@ body {
 .badge-converted { background: #dcfce7; color: #15803d; }
 .badge-open { background: #eff6ff; color: #1d4ed8; }
 .badge-review { background: #fee2e2; color: #b91c1c; }
+.badge-completed { background: #dcfce7; color: #15803d; }
+.badge-closed { background: #e2e8f0; color: #475569; }
 
 /* Modal */
 .modal-overlay {

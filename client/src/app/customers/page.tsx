@@ -43,10 +43,11 @@ const LABEL_CLASSES: Record<string, string> = {
   'Cold Lead': 'badge badge-cold-call',
   'Review': 'badge badge-review',
   'Converted': 'badge badge-converted',
-  'Closed': 'badge badge-not-interested',
+  'Completed': 'badge badge-completed',
+  'Closed': 'badge badge-closed',
 };
 
-const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Converted', 'Closed'];
+const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Converted', 'Completed', 'Closed'];
 
 export default function CustomersPage() {
   const [records, setRecords] = useState<CustomerRecord[]>([]);

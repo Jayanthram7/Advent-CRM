@@ -23,6 +23,8 @@ const LABEL_CLASSES: Record<string, string> = {
   'Follow Up': 'badge badge-follow-up',
   'Hot Lead': 'badge badge-hot-lead',
   'Cold Lead': 'badge badge-cold-lead',
+  'Completed': 'badge badge-completed',
+  'Closed': 'badge badge-closed',
 };
 
 const METRIC_LABELS: Record<string, string> = {
@@ -454,11 +456,7 @@ export default function HomePage() {
                               <td>{lead.leadSource}</td>
                               <td>
                                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                  {lead.isConverted ? (
-                                    <span className="badge badge-converted">Converted</span>
-                                  ) : (
-                                    (lead.labels || []).map((l: string) => <span key={l} className={LABEL_CLASSES[l] || 'badge'}>{l}</span>)
-                                  )}
+                                  {(lead.labels || []).map((l: string) => <span key={l} className={LABEL_CLASSES[l] || 'badge'}>{l}</span>)}
                                 </div>
                               </td>
                               <td style={{ color: '#9ca3af', fontSize: 13 }}>{format(new Date(lead.createdAt), 'MMM d')}</td>
@@ -496,8 +494,7 @@ export default function HomePage() {
                               <td style={{ padding: '12px 24px', color: '#475569', fontSize: 13 }}>{r.releaseVersion || r.data?.Release || r.data?.['Release Version'] || '-'}</td>
                               <td style={{ padding: '12px 24px' }}>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                  {r.status === 'Closed' && <span className="badge badge-converted" style={{ fontSize: 10 }}>Closed</span>}
-                                  {r.status !== 'Closed' && (r.labels || []).slice(0, 2).map((l: string) => <span key={l} className={LABEL_CLASSES[l] || 'badge'} style={{ fontSize: 10 }}>{l}</span>)}
+                                  {(r.labels || []).slice(0, 2).map((l: string) => <span key={l} className={LABEL_CLASSES[l] || 'badge'} style={{ fontSize: 10 }}>{l}</span>)}
                                 </div>
                               </td>
                               <td style={{ padding: '12px 24px' }}>

@@ -7,6 +7,7 @@ const { Resend } = require('resend');
 
 const resend = new Resend('re_LSfRqxrV_9dAg5rmMmoe6kHDJxzBCkThR');
 const authMiddleware = require('../middleware/authMiddleware');
+const roleMiddleware = require('../middleware/roleMiddleware');
 
 // All routes require authentication
 router.use(authMiddleware);
@@ -743,6 +744,9 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/labels', async (req, res) => {
   try {
     const { labels } = req.body;
+    if (labels && Array.isArray(labels) && (labels.includes('Completed') || labels.includes('Closed')) && req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'Only Admins can mark records as Completed/Closed' });
+    }
     const call = await Call.findByIdAndUpdate(
       req.params.id,
       { labels },
@@ -766,7 +770,7 @@ router.post('/:id/labels', async (req, res) => {
 });
 
 // POST /api/calls/:id/convert - mark as converted
-router.post('/:id/convert', async (req, res) => {
+router.post('/:id/convert', roleMiddleware('Admin'), async (req, res) => {
   try {
     const call = await Call.findByIdAndUpdate(
       req.params.id,

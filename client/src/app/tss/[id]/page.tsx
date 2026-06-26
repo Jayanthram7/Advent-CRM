@@ -10,7 +10,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import AnalyticsModalComponent from '@/components/AnalyticsModal';
 
-const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review'];
+const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Completed', 'Closed'];
 const LABEL_CLASSES: Record<string, string> = {
   'Open': 'badge badge-open',
   'Call Back': 'badge badge-call-back',
@@ -20,6 +20,8 @@ const LABEL_CLASSES: Record<string, string> = {
   'Hot Lead': 'badge badge-hot-lead',
   'Cold Lead': 'badge badge-cold-lead',
   'Review': 'badge badge-review',
+  'Completed': 'badge badge-completed',
+  'Closed': 'badge badge-closed',
 };
 
 export interface TssRecord {
@@ -138,8 +140,8 @@ function RowMenu({ record, onRefresh, users }: { record: TssRecord; onRefresh: (
               <div className="dropdown-item" onClick={e => { e.stopPropagation(); setSubmenu('labels'); }}><Tag size={14} />Add Label</div>
               <div className="dropdown-item" onClick={e => { e.stopPropagation(); setSubmenu('date_followup'); }}><Clock size={14} />Set Follow Up</div>
               <div className="dropdown-item" onClick={e => { e.stopPropagation(); setSubmenu('date_renewal'); }}><Calendar size={14} />Set Renewal</div>
-              {record.status !== 'Closed' && (
-                <div className="dropdown-item" onClick={e => { e.stopPropagation(); closeRecord(); }}><CheckCircle size={14} />Mark as Closed</div>
+              {record.status !== 'Closed' && user?.role === 'Admin' && (
+                <div className="dropdown-item" onClick={e => { e.stopPropagation(); closeRecord(); }}><CheckCircle size={14} />Mark as Completed</div>
               )}
               <div className="dropdown-item" onClick={e => { e.stopPropagation(); setNoteOpen(true); }}><FileText size={14} />Add Note</div>
               {user?.role !== 'Agent' && (
@@ -155,7 +157,7 @@ function RowMenu({ record, onRefresh, users }: { record: TssRecord; onRefresh: (
           {submenu === 'labels' && (
             <div style={{ padding: 10 }} onClick={e => e.stopPropagation()}>
               <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>SELECT LABEL</p>
-              {LABEL_OPTIONS.map(lbl => (
+              {LABEL_OPTIONS.filter(lbl => user?.role === 'Admin' || (lbl !== 'Completed' && lbl !== 'Closed')).map(lbl => (
                 <label key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer', fontSize: 13 }}>
                   <input type="radio" checked={selectedLabels.length === 0 ? lbl === 'Open' : selectedLabels[0] === lbl}
                     onChange={() => setSelectedLabels([lbl])} />
@@ -264,8 +266,7 @@ export function RecordDrawer({ record, defaultTab = 'details', onClose, onRefres
                   {record.customerName || 'Unknown Customer'}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                  {record.status === 'Closed' && <span className="badge badge-converted" style={{ fontSize: 11 }}>Closed</span>}
-                  {record.status !== 'Closed' && (record.labels || []).map(l => (
+                  {(record.labels || []).map(l => (
                     <span key={l} className={LABEL_CLASSES[l] || 'badge'} style={{ fontSize: 11 }}>{l}</span>
                   ))}
                 </div>
@@ -507,6 +508,16 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [reviewCount, setReviewCount] = useState(0);
+  const isAdmin = user?.role === 'Admin';
+
+  useEffect(() => {
+    if (isAdmin && id) {
+      api.get(`/tss/datasets/${id}/records`, { params: { limit: '1', view: 'review' } })
+        .then(res => setReviewCount(res.data.total))
+        .catch(err => console.error(err));
+    }
+  }, [isAdmin, id, records]);
 
   const fetchRecords = async (p = page, q = search, v = viewFilter) => {
     setLoading(true);
@@ -554,6 +565,7 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
+                position: 'relative',
                 ...(viewFilter === 'review' ? {
                   background: '#fee2e2',
                   color: '#b91c1c',
@@ -563,6 +575,28 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
             >
               <AlertCircle size={14} style={viewFilter === 'review' ? { color: '#b91c1c' } : {}} />
               Needs Review
+              {reviewCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-6px',
+                  right: '-6px',
+                  background: '#ef4444',
+                  color: 'white',
+                  borderRadius: '50%',
+                  minWidth: '18px',
+                  height: '18px',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 4px',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                  zIndex: 10
+                }}>
+                  {reviewCount}
+                </span>
+              )}
             </button>
           )}
         </TopBar>
@@ -702,8 +736,7 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
                         <td style={{ padding: '12px 12px', color: '#475569', fontSize: 13 }}>{r.releaseVersion || r.data?.Release || r.data?.['Release Version'] || '-'}</td>
                         <td style={{ padding: '12px 12px' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {r.status === 'Closed' && <span className="badge badge-converted" style={{ fontSize: 10 }}>Closed</span>}
-                            {r.status !== 'Closed' && (r.labels || []).slice(0, 2).map(l => <span key={l} className={LABEL_CLASSES[l] || 'badge'} style={{ fontSize: 10 }}>{l}</span>)}
+                            {(r.labels || []).slice(0, 2).map(l => <span key={l} className={LABEL_CLASSES[l] || 'badge'} style={{ fontSize: 10 }}>{l}</span>)}
                             {(r.labels?.length || 0) > 2 && <span className="badge" style={{ fontSize: 10 }}>+{(r.labels?.length || 0) - 2}</span>}
                           </div>
                         </td>

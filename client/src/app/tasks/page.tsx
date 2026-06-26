@@ -62,10 +62,11 @@ const LABEL_CLASSES: Record<string, string> = {
   'Cold Lead': 'badge badge-cold-call',
   'Review': 'badge badge-review',
   'Converted': 'badge badge-converted',
-  'Closed': 'badge badge-not-interested',
+  'Completed': 'badge badge-completed',
+  'Closed': 'badge badge-closed',
 };
 
-const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review'];
+const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Completed', 'Closed'];
 
 // ─── Task Row Menu ─────────────────────────────────────────────────────────────
 function TaskRowMenu({ record, onRefresh, users }: { record: TaskRecord; onRefresh: () => void; users: any[] }) {
@@ -211,10 +212,10 @@ function TaskRowMenu({ record, onRefresh, users }: { record: TaskRecord; onRefre
                 <div className="dropdown-item" onClick={() => setSubmenu('assign')}><User size={14} />Assign To</div>
               )}
               {record.status !== 'Converted' && record.status !== 'Closed' && (
-                isAdminOrManager ? (
+                user?.role === 'Admin' ? (
                   <div className="dropdown-item" onClick={convertOrClose}>
                     <CheckCircle size={14} />
-                    {record.source === 'tss' ? 'Mark as Closed' : 'Mark as Converted'}
+                    Mark as Completed
                   </div>
                 ) : (
                   <div className="dropdown-item" onClick={askReview}>
@@ -236,7 +237,7 @@ function TaskRowMenu({ record, onRefresh, users }: { record: TaskRecord; onRefre
           {submenu === 'labels' && (
             <div style={{ padding: 10 }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>SELECT LABEL</p>
-              {LABEL_OPTIONS.map(lbl => (
+              {LABEL_OPTIONS.filter(lbl => user?.role === 'Admin' || (lbl !== 'Completed' && lbl !== 'Closed')).map(lbl => (
                 <label key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer', fontSize: 13 }}>
                   <input type="radio" checked={selectedLabels.length === 0 ? lbl === 'Open' : selectedLabels[0] === lbl}
                     onChange={() => setSelectedLabels([lbl])} />
@@ -376,6 +377,22 @@ export default function TasksPage() {
   const [activeDrawerSource, setActiveDrawerSource] = useState<'leads' | 'calls' | 'events' | 'tss' | null>(null);
   const [drawerTab, setDrawerTab] = useState<'details' | 'notes' | 'log'>('details');
   const [drawerLoading, setDrawerLoading] = useState(false);
+  const [reviewCount, setReviewCount] = useState(0);
+
+  useEffect(() => {
+    if (isAdminOrManager) {
+      const params: Record<string, string> = {
+        limit: '1',
+        label: 'Review'
+      };
+      if (selectedAgentId && user?.role !== 'Admin') {
+        params.userId = selectedAgentId;
+      }
+      api.get('/users/tasks', { params })
+        .then(res => setReviewCount(res.data.total))
+        .catch(err => console.error(err));
+    }
+  }, [isAdminOrManager, selectedAgentId, records, user]);
 
   const handleRowClick = async (item: TaskRecord) => {
     setDrawerLoading(true);
@@ -430,7 +447,7 @@ export default function TasksPage() {
       
       // Determine user filter
       if (isAdminOrManager) {
-        if (selectedAgentId) {
+        if (selectedAgentId && !(user?.role === 'Admin' && filterLabel === 'Review')) {
           params.userId = selectedAgentId;
         }
       } else {
@@ -540,6 +557,7 @@ export default function TasksPage() {
               display: 'flex',
               alignItems: 'center',
               gap: 6,
+              position: 'relative',
               ...(filterLabel === 'Review' ? {
                 background: '#fee2e2',
                 color: '#b91c1c',
@@ -549,6 +567,28 @@ export default function TasksPage() {
           >
             <AlertCircle size={14} style={filterLabel === 'Review' ? { color: '#b91c1c' } : {}} />
             Needs Review
+            {reviewCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '-6px',
+                right: '-6px',
+                background: '#ef4444',
+                color: 'white',
+                borderRadius: '50%',
+                minWidth: '18px',
+                height: '18px',
+                fontSize: '10px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 4px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                zIndex: 10
+              }}>
+                {reviewCount}
+              </span>
+            )}
           </button>
         )}
       </TopBar>
