@@ -5,7 +5,7 @@ import TopBar from '@/components/TopBar';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { 
-  Search, Trash2, Mail, Phone, Building2, Award, Calendar
+  Search, Trash2, Mail, Phone, Building2, Award, Calendar, UserPlus, X, Plus, Check
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -18,12 +18,144 @@ interface QuizUser {
   score: number;
   totalQuestions: number;
   createdAt: string;
+  isConverted?: boolean;
 }
 
+const SOURCE_OPTIONS = ['Website', 'Cold Call', 'Referral', 'Social Media', 'Email Campaign', 'Walk-in', 'Other'];
+
+// ─── Create Lead Modal ───────────────────────────────────────────────────────
+function CreateLeadModal({ 
+  onClose, 
+  onCreated, 
+  initialData 
+}: { 
+  onClose: () => void; 
+  onCreated: () => void; 
+  initialData?: any 
+}) {
+  const [form, setForm] = useState({
+    firstName: initialData?.firstName || '',
+    lastName: initialData?.lastName || '',
+    email: initialData?.email || '',
+    phone: initialData?.phone || '',
+    secondaryPhone: '',
+    company: initialData?.company || '',
+    licenseNumber: '',
+    leadSource: 'Other',
+    address: '',
+    reason: initialData?.reason || '',
+    labels: ['Open']
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.firstName || !form.lastName) {
+      toast.error('First and last name are required');
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post('/leads', form);
+      toast.success('Lead created successfully!');
+      onCreated();
+      onClose();
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      toast.error(error?.response?.data?.message || 'Failed to create lead');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 680 }}>
+        <div className="modal-header">
+          <h2 className="modal-title">Create New Lead</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="form-group">
+                <label className="form-label">First Name *</label>
+                <input className="form-input" value={form.firstName} onChange={e => set('firstName', e.target.value)} placeholder="John" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Last Name *</label>
+                <input className="form-input" value={form.lastName} onChange={e => set('lastName', e.target.value)} placeholder="Doe" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Phone Number</label>
+                <input className="form-input" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+1 555 000 0000" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Secondary Phone</label>
+                <input className="form-input" value={form.secondaryPhone} onChange={e => set('secondaryPhone', e.target.value)} placeholder="+1 555 000 0001" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input className="form-input" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="john@example.com" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Company</label>
+                <input className="form-input" value={form.company} onChange={e => set('company', e.target.value)} placeholder="Acme Inc." />
+              </div>
+              <div className="form-group">
+                <label className="form-label">License Number</label>
+                <input className="form-input" value={form.licenseNumber} onChange={e => set('licenseNumber', e.target.value)} placeholder="LIC-12345" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Lead Source</label>
+                <select 
+                  className="form-input" 
+                  value={form.leadSource} 
+                  onChange={e => set('leadSource', e.target.value)}
+                  style={{ height: '42px', padding: '9px 12px' }}
+                >
+                  {SOURCE_OPTIONS.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">Address</label>
+                <input className="form-input" value={form.address} onChange={e => set('address', e.target.value)} placeholder="123 Main St, City, Country" />
+              </div>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">Reason</label>
+                <textarea
+                  className="form-input"
+                  value={form.reason}
+                  onChange={e => set('reason', e.target.value)}
+                  placeholder="Reason for enquiry..."
+                  rows={2}
+                  style={{ resize: 'none' }}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? <><div className="spinner" style={{ width: 16, height: 16 }} /> Creating...</> : <><Plus size={15} />Create Lead</>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
 export default function QuizUsersPage() {
   const [claims, setClaims] = useState<QuizUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  // Lead creation modal state
+  const [leadModal, setLeadModal] = useState<{ open: boolean; initialData?: any }>({ open: false });
 
   const fetchClaims = useCallback(async () => {
     setLoading(true);
@@ -59,6 +191,24 @@ export default function QuizUsersPage() {
     } catch (err) {
       toast.error('Failed to delete record');
     }
+  };
+
+  const handleConvertClick = (claim: QuizUser) => {
+    const nameParts = claim.name.trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '—';
+
+    setLeadModal({
+      open: true,
+      initialData: {
+        firstName,
+        lastName,
+        email: claim.email,
+        phone: claim.phone,
+        company: claim.organization || '',
+        reason: `Converted from Quiz App submission. Scored ${claim.score}/${claim.totalQuestions}.`
+      }
+    });
   };
 
   const getInitials = (name: string) => {
@@ -229,20 +379,40 @@ export default function QuizUsersPage() {
                         </div>
                       </td>
                       <td style={{ textAlign: 'right' }}>
-                        <button
-                          onClick={() => deleteClaim(claim._id, claim.name)}
-                          className="btn-danger"
-                          style={{
-                            padding: '6px 10px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer'
-                          }}
-                          title="Delete submission record"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <div style={{ display: 'inline-flex', gap: 8 }}>
+                          <button
+                            onClick={() => handleConvertClick(claim)}
+                            style={{
+                              padding: '6px 10px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              background: claim.isConverted ? '#22c55e' : '#1a73e8',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: 8,
+                              transition: 'background-color 0.2s'
+                            }}
+                            title={claim.isConverted ? "Already Converted (Click to add again)" : "Convert to CRM Lead"}
+                          >
+                            {claim.isConverted ? <Check size={14} /> : <UserPlus size={14} />}
+                          </button>
+                          <button
+                            onClick={() => deleteClaim(claim._id, claim.name)}
+                            className="btn-danger"
+                            style={{
+                              padding: '6px 10px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer'
+                            }}
+                            title="Delete submission record"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -252,6 +422,17 @@ export default function QuizUsersPage() {
           )}
         </div>
       </div>
+
+      {/* Render Lead Creation Modal */}
+      {leadModal.open && (
+        <CreateLeadModal 
+          initialData={leadModal.initialData}
+          onClose={() => setLeadModal({ open: false })}
+          onCreated={() => {
+            fetchClaims();
+          }}
+        />
+      )}
     </ProtectedLayout>
   );
 }

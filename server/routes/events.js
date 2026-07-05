@@ -4,9 +4,7 @@ const EventDataset = require('../models/EventDataset');
 const EventRecord = require('../models/EventRecord');
 const Note = require('../models/Note');
 const Activity = require('../models/Activity');
-const { Resend } = require('resend');
-
-const resend = new Resend('re_LSfRqxrV_9dAg5rmMmoe6kHDJxzBCkThR');
+const sendEmail = require('../utils/mailer');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
 
@@ -246,7 +244,7 @@ router.post('/records', async (req, res) => {
     // Optional: Send welcome email if email exists
     if (email) {
       try {
-        await resend.emails.send({
+        await sendEmail({
           from: 'Advent Systems <jayanthramnithin@gmail.com>',
           to: email,
           subject: 'Welcome to Advent Systems',

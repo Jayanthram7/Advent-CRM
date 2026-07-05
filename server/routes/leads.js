@@ -3,10 +3,7 @@ const router = express.Router();
 const Lead = require('../models/Lead');
 const Note = require('../models/Note');
 const Activity = require('../models/Activity');
-const { Resend } = require('resend');
-
-
-const resend = new Resend('re_LSfRqxrV_9dAg5rmMmoe6kHDJxzBCkThR');
+const sendEmail = require('../utils/mailer');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
 
@@ -328,7 +325,7 @@ router.post('/', async (req, res) => {
     // Send Welcome Email if lead has an email address
     if (email) {
       try {
-        await resend.emails.send({
+        await sendEmail({
           from: 'Advent Systems <jayanthramnithin@gmail.com>',
           to: email,
           subject: 'Welcome to Advent Systems',
@@ -345,7 +342,7 @@ router.post('/', async (req, res) => {
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      background-color: #f0f2f5;
+      background-color: #fef3c7;
       font-family: 'DM Sans', Arial, sans-serif;
       color: #1a1a2e;
     }
@@ -353,7 +350,8 @@ router.post('/', async (req, res) => {
     .email-wrapper {
       max-width: 600px;
       margin: 0 auto;
-      background-color: #f0f2f5;
+      background-color: #fef3c7;
+      padding: 24px 0;
     }
 
     /* View in browser */
@@ -594,20 +592,16 @@ router.post('/', async (req, res) => {
 <body>
 
 <div class="email-wrapper">
-  <div class="top-bar">
-    <a href="#">View this email in your browser</a>
-  </div>
+
 
   <div class="main-card">
     <div class="header">
-      <div class="logo"><span>Advent Systems</span></div>
+      <h1>Hey ${firstName},<br>Welcome to<br>Advent Systems.</h1>
 
-      <div class="tally-badge">
+      <div class="tally-badge" style="margin-top: 16px; margin-bottom: 24px;">
         <span class="star-icon">★★★★★</span>
         5-Star Certified Partner of Tally
       </div>
-
-      <h1>Hey ${firstName},<br>Welcome to<br>Advent Systems.</h1>
       <p>Promoted in the early 1980s under the leadership of <strong>Mr. Kanakaraj Chinnaswamy</strong>, Advent Systems is among the earliest IT/ITES organizations in the region — at the forefront of Sales, Support, Training, and Customization of Tally for over three decades.</p>
 
       <a href="https://adventsystems.vercel.app" class="cta-btn">Visit our Website</a>
@@ -636,11 +630,21 @@ router.post('/', async (req, res) => {
     </div>
 
     <div class="team-card">
-      <div class="avatar-row">
-        <div class="avatar">A</div>
-        <div class="avatar">S</div>
-        <div class="avatar">T</div>
-        <div class="avatar">+</div>
+      <div class="avatar-row" style="margin-bottom: 16px;">
+        <span style="
+          display: inline-block;
+          background: linear-gradient(135deg, #4f46e5, #7c3aed);
+          color: #ffffff;
+          font-family: 'DM Sans', Arial, sans-serif;
+          font-size: 13px;
+          font-weight: 600;
+          padding: 8px 18px;
+          border-radius: 8px;
+          letter-spacing: 0.5px;
+          box-shadow: 0 2px 8px rgba(79, 70, 229, 0.2);
+        ">
+          Simple yet Powerful
+        </span>
       </div>
       <p>Thanks from our team @</p>
       <div class="company-name">Advent Systems</div>
@@ -655,11 +659,7 @@ router.post('/', async (req, res) => {
       <p class="contact-line">
         📞 <a href="tel:9842276297">9842276297</a> &nbsp;/&nbsp; <a href="tel:9965573231">9965573231</a>
       </p>
-      <p>
-        To update your communication settings or to unsubscribe, use the links below.<br>
-        <a href="#">Manage Preferences</a> | <a href="#">Unsubscribe</a>
-      </p>
-      <p style="margin-top:8px;">© 2025 Advent Systems. All rights reserved.</p>
+      <p style="margin-top:12px;">© 2025 Advent Systems. All rights reserved.</p>
     </div>
   </div>
 

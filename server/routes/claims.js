@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Claim = require('../models/Claim');
+const Lead = require('../models/Lead');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
 
@@ -53,8 +54,19 @@ router.get('/', authMiddleware, roleMiddleware('Admin'), async (req, res) => {
         ]
       };
     }
-    const claims = await Claim.find(query).sort({ createdAt: -1 });
-    res.json(claims);
+    const claims = await Claim.find(query).sort({ createdAt: -1 }).lean();
+    
+    // Check if leads with the same emails exist in the database
+    const emails = claims.map(c => c.email).filter(Boolean);
+    const existingLeads = await Lead.find({ email: { $in: emails } }).select('email');
+    const leadEmails = new Set(existingLeads.map(l => l.email.toLowerCase().trim()));
+
+    const claimsWithStatus = claims.map(c => ({
+      ...c,
+      isConverted: c.email ? leadEmails.has(c.email.toLowerCase().trim()) : false
+    }));
+
+    res.json(claimsWithStatus);
   } catch (err) {
     console.error('Error fetching claims:', err);
     res.status(500).json({ message: 'Server error fetching claim data', error: err.message });
