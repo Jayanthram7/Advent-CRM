@@ -12,6 +12,7 @@ const userRoutes = require('./routes/users');
 const noteRoutes = require('./routes/notes');
 const dashboardRoutes = require('./routes/dashboard');
 const tssRoutes = require('./routes/tss');
+const claimRoutes = require('./routes/claims');
 
 const app = express();
 
@@ -63,6 +64,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/tss', tssRoutes);
+app.use('/api/claims', claimRoutes);
 
 app.get('/api/health', (req, res) => {
   const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
