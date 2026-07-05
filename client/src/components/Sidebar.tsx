@@ -151,7 +151,27 @@ export default function Sidebar() {
       {/* Logo */}
       {sidebarCollapsed ? (
         <div className="sidebar-logo" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '16px 0' }}>
-          <div className="sidebar-logo-icon">A</div>
+          <div style={{
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            backgroundColor: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            padding: 4
+          }}>
+            <img 
+              src="/Adventlogo.png" 
+              alt="Advent Logo" 
+              style={{
+                maxWidth: '100%',
+                maxHeight: '100%',
+                objectFit: 'contain'
+              }} 
+            />
+          </div>
           <button 
             onClick={toggleSidebar} 
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', padding: '4px' }}
@@ -163,7 +183,27 @@ export default function Sidebar() {
       ) : (
         <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div className="sidebar-logo-icon">A</div>
+            <div style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              backgroundColor: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              padding: 4
+            }}>
+              <img 
+                src="/Adventlogo.png" 
+                alt="Advent Logo" 
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  objectFit: 'contain'
+                }} 
+              />
+            </div>
             <span className="sidebar-logo-text">Advent CRM</span>
           </div>
           <button 
