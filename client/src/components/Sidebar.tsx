@@ -6,7 +6,7 @@ import {
   Home, Users, Target, LogOut,
   ChevronDown, ChevronRight, ChevronLeft, Circle,
   Inbox, Clock, Calendar, CheckCircle2,
-  Database, Upload, FileText, X, Phone, Building2, Contact, CheckSquare, Award
+  Database, Upload, FileText, X, Phone, Building2, Contact, CheckSquare, Award, Mail
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -382,6 +382,23 @@ export default function Sidebar() {
             >
               <Award size={15} />
               <span className="sidebar-item-text">Quiz users</span>
+            </div>
+            <div
+              onClick={() => {
+                if (pathname !== '/send-emails') {
+                  if (user?.email === 'jayanthramnithin@gmail.com') {
+                    router.push('/send-emails');
+                  } else {
+                    setAdminTargetRoute('/send-emails');
+                    setAdminAuthStep(1);
+                  }
+                }
+              }}
+              className={`sidebar-item ${pathname === '/send-emails' ? 'active' : ''}`}
+              style={{ cursor: 'pointer', display: 'flex', justifyContent: sidebarCollapsed ? 'center' : 'flex-start', marginTop: 4 }}
+            >
+              <Mail size={15} />
+              <span className="sidebar-item-text">Send Emails</span>
             </div>
           </>
         )}
