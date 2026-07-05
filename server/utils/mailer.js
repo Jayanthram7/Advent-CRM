@@ -24,6 +24,10 @@ if (emailUser && emailUser.endsWith('@gmail.com')) {
 const transporter = nodemailer.createTransport(mailConfig);
 
 const sendEmail = async ({ from, to, subject, html }) => {
+  if (!emailUser || !emailPass) {
+    console.warn('⚠️ SMTP credentials (EMAIL_USER/EMAIL_PASS) are not configured. Skipping email dispatch.');
+    return null;
+  }
   return transporter.sendMail({
     from: from || `"Advent Systems" <${emailUser}>`,
     to,
