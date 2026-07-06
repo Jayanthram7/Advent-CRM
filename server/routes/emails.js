@@ -56,6 +56,116 @@ router.delete('/templates/:id', async (req, res) => {
   }
 });
 
+// GET /api/emails/contacts/tss - Fetch filtered TSS contacts
+router.get('/contacts/tss', async (req, res) => {
+  try {
+    const { label, dateField, startDate, endDate } = req.query;
+    const query = {};
+
+    if (label && label !== 'All') {
+      query.labels = label;
+    }
+
+    const tssRecords = await TssRecord.find(query).lean();
+
+    // Helper to extract email dynamically from TSS Map data
+    const getTssEmail = (record) => {
+      if (!record.data) return null;
+      const emailKey = Object.keys(record.data).find(k => 
+        k.toLowerCase().includes('email') || k.toLowerCase().includes('e-mail')
+      );
+      return emailKey ? String(record.data[emailKey]).trim() : null;
+    };
+
+    // Helper to get robust date value
+    const getTssDateValue = (record, field) => {
+      if (field === 'createdAt') {
+        return record.createdAt ? new Date(record.createdAt) : null;
+      }
+      if (field === 'callbackDate' && record.callbackDate) {
+        return new Date(record.callbackDate);
+      }
+      if (field === 'followUpDate' && record.followUpDate) {
+        return new Date(record.followUpDate);
+      }
+
+      // For renewalDate, try renewalDate field, then fall back to expiry date keys in data
+      if (field === 'renewalDate') {
+        if (record.renewalDate && !isNaN(new Date(record.renewalDate).getTime())) {
+          return new Date(record.renewalDate);
+        }
+        if (record.data) {
+          const dateKey = Object.keys(record.data).find(k => 
+            k.toLowerCase().includes('expiry') || k.toLowerCase().includes('renewal')
+          );
+          if (dateKey) {
+            const parsed = new Date(record.data[dateKey]);
+            if (!isNaN(parsed.getTime())) {
+              return parsed;
+            }
+          }
+        }
+      }
+
+      // Default fallback: check schema field, then custom data map keys
+      if (record[field] && !isNaN(new Date(record[field]).getTime())) {
+        return new Date(record[field]);
+      }
+      if (record.data && record.data[field]) {
+        const parsed = new Date(record.data[field]);
+        if (!isNaN(parsed.getTime())) {
+          return parsed;
+        }
+      }
+      return null;
+    };
+
+    const contacts = [];
+    const seenEmails = new Set();
+
+    const filterStart = startDate ? new Date(startDate) : null;
+    const filterEnd = endDate ? new Date(endDate) : null;
+
+    // Set time limits for strict day comparisons
+    if (filterStart) {
+      filterStart.setHours(0, 0, 0, 0);
+    }
+    if (filterEnd) {
+      filterEnd.setHours(23, 59, 59, 999);
+    }
+
+    tssRecords.forEach(t => {
+      const email = getTssEmail(t);
+      if (!email) return;
+
+      // Date filtering in memory
+      if (dateField && (filterStart || filterEnd)) {
+        const recordDate = getTssDateValue(t, dateField);
+        if (!recordDate) return; // Skip if no date matches
+
+        if (filterStart && recordDate < filterStart) return;
+        if (filterEnd && recordDate > filterEnd) return;
+      }
+
+      const emailLower = email.toLowerCase().trim();
+      if (!seenEmails.has(emailLower)) {
+        seenEmails.add(emailLower);
+        contacts.push({
+          name: t.customerName || 'TSS Contact',
+          email: email,
+          phone: t.mobileNumber || '',
+          source: 'TSS'
+        });
+      }
+    });
+
+    res.json(contacts);
+  } catch (err) {
+    console.error('Error fetching filtered TSS contacts:', err);
+    res.status(500).json({ message: 'Error fetching filtered TSS contacts' });
+  }
+});
+
 // GET /api/emails/contacts - Search contacts across Leads and Quiz Users (Claims)
 router.get('/contacts', async (req, res) => {
   try {

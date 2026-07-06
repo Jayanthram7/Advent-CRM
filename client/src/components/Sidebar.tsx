@@ -42,6 +42,7 @@ export default function Sidebar() {
   const [adminForm, setAdminForm] = useState({ username: '', password: '', pin: '' });
   const [adminAuthLoading, setAdminAuthLoading] = useState(false);
   const [adminTargetRoute, setAdminTargetRoute] = useState('/users');
+  const [logoHovered, setLogoHovered] = useState(false);
 
   useEffect(() => {
     fetch('/api/events/datasets', {
@@ -151,19 +152,22 @@ export default function Sidebar() {
       {/* Logo */}
       {sidebarCollapsed ? (
         <div className="sidebar-logo" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '16px 0' }}>
-          <div style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            backgroundColor: '#ffffff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden',
-            padding: 4
-          }}>
+          <div 
+            onMouseEnter={() => setLogoHovered(true)}
+            onMouseLeave={() => setLogoHovered(false)}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              backgroundColor: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+            }}
+          >
             <img 
-              src="/Adventlogo.png" 
+              src={logoHovered ? "/Frame 9.png" : "/Frame 7.png"} 
               alt="Advent Logo" 
               style={{
                 maxWidth: '100%',
@@ -183,19 +187,22 @@ export default function Sidebar() {
       ) : (
         <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              backgroundColor: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-              padding: 4
-            }}>
+            <div 
+              onMouseEnter={() => setLogoHovered(true)}
+              onMouseLeave={() => setLogoHovered(false)}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                backgroundColor: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+              }}
+            >
               <img 
-                src="/Adventlogo.png" 
+                src={logoHovered ? "/Frame 9.png" : "/Frame 7.png"} 
                 alt="Advent Logo" 
                 style={{
                   maxWidth: '100%',
@@ -447,8 +454,16 @@ export default function Sidebar() {
       {/* User info */}
       <div className="sidebar-user-container" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '12px 16px', display: 'flex', flexDirection: 'column', alignItems: sidebarCollapsed ? 'center' : 'stretch' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, width: '100%', justifyContent: sidebarCollapsed ? 'center' : 'flex-start' }}>
-          <div className="avatar" style={{ width: 30, height: 30, fontSize: 11 }}>
-            {user?.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+          <div className="avatar" style={{ width: 30, height: 30, fontSize: 11, overflow: 'hidden' }}>
+            {user?.email === 'jayanthramnithin@gmail.com' ? (
+              <img 
+                src="/WhatsApp Image 2026-07-06 at 9.53.29 AM.jpeg" 
+                alt="Profile" 
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              user?.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2)
+            )}
           </div>
           <div className="sidebar-user-text" style={{ flex: 1, minWidth: 0 }}>
             <div style={{ color: '#e2e8f0', fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

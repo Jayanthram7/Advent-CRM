@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
 const Lead = require('../models/Lead');
 const Note = require('../models/Note');
 const Activity = require('../models/Activity');
@@ -329,6 +330,18 @@ router.post('/', async (req, res) => {
           from: 'Advent Systems <jayanthramnithin@gmail.com>',
           to: email,
           subject: 'Welcome to Advent Systems',
+          attachments: [
+            {
+              filename: 'Tally-logo.jpg',
+              path: path.join(__dirname, '../../client/public/Tally-logo.jpg'),
+              cid: 'tallylogo'
+            },
+            {
+              filename: 'Adventlogo.png',
+              path: path.join(__dirname, '../../client/public/Adventlogo.png'),
+              cid: 'adventlogo'
+            }
+          ],
           html: `
 <!DOCTYPE html>
 <html lang="en">
@@ -595,7 +608,20 @@ router.post('/', async (req, res) => {
 
 
   <div class="main-card">
-    <div class="header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr>
+        <td style="padding: 20px 24px 0 24px; text-align: left; vertical-align: middle;">
+          <img src="cid:tallylogo" alt="Tally Logo" style="width: 70px; max-width: 70px; height: auto; display: inline-block; border: 0;" />
+        </td>
+        <td style="padding: 20px 24px 0 24px; text-align: right; vertical-align: middle;">
+          <img src="cid:signaturelogo" alt="Logo" style="width: 70px; max-width: 70px; height: auto; display: inline-block; border: 0;" />
+        </td>
+      </tr>
+    </table>
+    <div class="header" style="padding-top: 16px;">
+      <div style="margin-bottom: 24px;">
+        <img src="cid:adventlogo" alt="Advent Systems" style="width: 80px; max-width: 80px; height: auto; display: inline-block; border-radius: 12px; vertical-align: middle;" />
+      </div>
       <h1>Hey ${firstName},<br>Welcome to<br>Advent Systems.</h1>
 
       <div class="tally-badge" style="margin-top: 16px; margin-bottom: 24px;">
@@ -649,22 +675,6 @@ router.post('/', async (req, res) => {
       <p>Thanks from our team @</p>
       <div class="company-name">Advent Systems</div>
     </div>
-
-    <div class="footer">
-      <p>You received this email because you created an account or subscribed to updates from Advent Systems.</p>
-      <p>
-        <strong>Advent Systems</strong> — 5-Star Certified Tally Partner<br>
-        <a href="https://adventsystems.vercel.app">adventsystems.vercel.app</a>
-      </p>
-      <p class="contact-line">
-        📞 <a href="tel:9842276297">9842276297</a> &nbsp;/&nbsp; <a href="tel:9965573231">9965573231</a>
-      </p>
-      <p style="margin-top:12px;">© 2025 Advent Systems. All rights reserved.</p>
-    </div>
-  </div>
-
-  <div class="watermark">
-    <span>Advent</span>
   </div>
 </div>
 

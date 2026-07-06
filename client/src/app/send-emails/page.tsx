@@ -29,6 +29,15 @@ export default function SendEmailsPage() {
   const [selectedRecipients, setSelectedRecipients] = useState<Contact[]>([]);
   const [searching, setSearching] = useState(false);
 
+  // State for TSS filtering
+  const [tssLabelFilter, setTssLabelFilter] = useState('All');
+  const [tssDateField, setTssDateField] = useState('renewalDate');
+  const [tssDateRange, setTssDateRange] = useState('All');
+  const [tssStartDate, setTssStartDate] = useState('');
+  const [tssEndDate, setTssEndDate] = useState('');
+
+  const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Completed', 'Closed'];
+
   // State for templates
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
@@ -247,6 +256,94 @@ export default function SendEmailsPage() {
     }
   };
 
+  // Helper: fetch filtered TSS contacts
+  const getFilteredTssContacts = async (params: any) => {
+    try {
+      const res = await api.get('/emails/contacts/tss', { params });
+      return res.data as Contact[];
+    } catch (err) {
+      console.error('Error fetching TSS contacts:', err);
+      toast.error('Failed to load TSS contacts');
+      return [];
+    }
+  };
+
+  // Helper: add multiple contacts with duplicate checks
+  const addBulkRecipients = (contacts: Contact[]) => {
+    if (contacts.length === 0) {
+      toast.error('No contacts found matching the criteria');
+      return;
+    }
+    const newRecipients = [...selectedRecipients];
+    let addedCount = 0;
+    contacts.forEach(contact => {
+      if (!newRecipients.some(r => r.email.toLowerCase().trim() === contact.email.toLowerCase().trim())) {
+        newRecipients.push(contact);
+        addedCount++;
+      }
+    });
+    setSelectedRecipients(newRecipients);
+    if (addedCount > 0) {
+      toast.success(`Added ${addedCount} TSS recipients`);
+    } else {
+      toast.success('All matching contacts are already in the list');
+    }
+  };
+
+  // Action: Add All TSS
+  const addAllTss = async () => {
+    const contacts = await getFilteredTssContacts({ label: 'All', dateField: '', startDate: '', endDate: '' });
+    addBulkRecipients(contacts);
+  };
+
+  // Action: Add This Month TSS
+  const addThisMonthTss = async () => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+    
+    const contacts = await getFilteredTssContacts({
+      label: 'All',
+      dateField: 'renewalDate',
+      startDate: startOfMonth,
+      endDate: endOfMonth
+    });
+    addBulkRecipients(contacts);
+  };
+
+  // Action: Add Filtered TSS
+  const addFilteredTss = async () => {
+    let start = '';
+    let end = '';
+    
+    if (tssDateRange === 'ThisMonth') {
+      const now = new Date();
+      start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+    } else if (tssDateRange === 'Today') {
+      const now = new Date();
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
+    } else if (tssDateRange === 'Custom') {
+      if (!tssStartDate || !tssEndDate) {
+        toast.error('Please specify start and end dates');
+        return;
+      }
+      start = new Date(tssStartDate).toISOString();
+      const endDateObj = new Date(tssEndDate);
+      endDateObj.setHours(23, 59, 59, 999);
+      end = endDateObj.toISOString();
+    }
+    
+    const contacts = await getFilteredTssContacts({
+      label: tssLabelFilter,
+      dateField: tssDateRange !== 'All' ? tssDateField : '',
+      startDate: start,
+      endDate: end
+    });
+    addBulkRecipients(contacts);
+  };
+
   const openSaveModal = () => {
     if (selectedTemplateId) {
       const current = templates.find(t => t._id === selectedTemplateId);
@@ -351,6 +448,124 @@ export default function SendEmailsPage() {
                 )}
               </div>
             )}
+
+            {/* TSS Bulk Add Section */}
+            <div style={{ padding: 12, border: '1px solid #cbd5e1', borderRadius: 8, background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Plus size={16} style={{ color: '#1a73e8' }} /> Add TSS Contacts in Bulk
+              </div>
+              
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '6px 10px', fontSize: 12, background: 'white', border: '1px solid #cbd5e1', cursor: 'pointer', borderRadius: 6 }}
+                  onClick={addAllTss}
+                  disabled={sending}
+                >
+                  All TSS
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '6px 10px', fontSize: 12, background: 'white', border: '1px solid #cbd5e1', cursor: 'pointer', borderRadius: 6 }}
+                  onClick={addThisMonthTss}
+                  disabled={sending}
+                >
+                  This Month's TSS
+                </button>
+              </div>
+
+              {/* Advanced Filters */}
+              <details style={{ fontSize: 12, borderTop: '1px solid #cbd5e1', paddingTop: 8 }}>
+                <summary style={{ cursor: 'pointer', color: '#1a73e8', fontWeight: 600, outline: 'none', userSelect: 'none' }}>
+                  Filter TSS by label & date
+                </summary>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 500 }}>TSS Label</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '6px 8px', fontSize: 12, background: 'white', width: '100%' }}
+                      value={tssLabelFilter}
+                      onChange={e => setTssLabelFilter(e.target.value)}
+                    >
+                      <option value="All">All Labels</option>
+                      {LABEL_OPTIONS.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 500 }}>Date Field</label>
+                      <select
+                        className="form-input"
+                        style={{ padding: '6px 8px', fontSize: 12, background: 'white', width: '100%' }}
+                        value={tssDateField}
+                        onChange={e => setTssDateField(e.target.value)}
+                      >
+                        <option value="renewalDate">Renewal Date</option>
+                        <option value="followUpDate">Follow Up Date</option>
+                        <option value="callbackDate">Callback Date</option>
+                        <option value="createdAt">Created Date</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 500 }}>Date Range</label>
+                      <select
+                        className="form-input"
+                        style={{ padding: '6px 8px', fontSize: 12, background: 'white', width: '100%' }}
+                        value={tssDateRange}
+                        onChange={e => setTssDateRange(e.target.value)}
+                      >
+                        <option value="All">All Time</option>
+                        <option value="ThisMonth">This Month</option>
+                        <option value="Today">Today</option>
+                        <option value="Custom">Custom Range</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {tssDateRange === 'Custom' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 10, color: '#64748b', marginBottom: 2 }}>Start Date</label>
+                        <input
+                          type="date"
+                          className="form-input"
+                          style={{ padding: '4px 6px', fontSize: 12, background: 'white', width: '100%' }}
+                          value={tssStartDate}
+                          onChange={e => setTssStartDate(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 10, color: '#64748b', marginBottom: 2 }}>End Date</label>
+                        <input
+                          type="date"
+                          className="form-input"
+                          style={{ padding: '4px 6px', fontSize: 12, background: 'white', width: '100%' }}
+                          value={tssEndDate}
+                          onChange={e => setTssEndDate(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ padding: '6px 12px', fontSize: 12, width: '100%', marginTop: 4, cursor: 'pointer' }}
+                    onClick={addFilteredTss}
+                    disabled={sending}
+                  >
+                    Add Filtered TSS Contacts
+                  </button>
+                </div>
+              </details>
+            </div>
 
             {/* Selection Status */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>

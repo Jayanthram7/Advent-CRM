@@ -36,6 +36,7 @@ const connectDB = async () => {
     }).then(async (m) => {
       console.log('✅ MongoDB connected');
       await seedAdmin();
+      await seedTemplates();
       return m;
     }).catch(err => {
       dbPromise = null;
@@ -98,6 +99,47 @@ async function seedAdmin() {
     }
   } catch (e) {
     console.error('Seed error:', e.message);
+  }
+}
+
+async function seedTemplates() {
+  try {
+    const EmailTemplate = require('./models/EmailTemplate');
+    const templates = [
+      {
+        name: 'Tally License Expiry',
+        subject: 'Action Required: Your Tally License is Expiring Soon',
+        body: `<p><strong>Dear {{name}},</strong></p>
+<p>This is a friendly reminder that your Tally Prime license subscription is expiring in the next few days.</p>
+<p>To avoid any disruption to your accounting and business compliance operations, we recommend renewing your license before the expiry date.</p>
+<p>Please reply to this email or contact us at our numbers below, and our team will assist you with the renewal process immediately.</p>`
+      },
+      {
+        name: 'Tally Prime New Feature Announcement',
+        subject: 'Exciting New Feature Announcement: Enhance Your Tally Workflow',
+        body: `<p><strong>Dear {{name}},</strong></p>
+<p>We are excited to share a new capability in Tally Prime designed to optimize your business workflow!</p>
+<p>With this new update, you can now seamlessly synchronize your business data, automate manual entry, and generate advanced reports with greater ease.</p>
+<p>If you'd like to schedule a quick demo or update your Tally software to enable these new features, please reach out to us. We're here to help you get the most out of Tally.</p>`
+      }
+    ];
+
+    for (const t of templates) {
+      const exists = await EmailTemplate.findOne({ name: t.name });
+      if (!exists) {
+        await EmailTemplate.create(t);
+        console.log(`✅ Seeded template: ${t.name}`);
+      } else {
+        if (exists.body !== t.body || exists.subject !== t.subject) {
+          exists.subject = t.subject;
+          exists.body = t.body;
+          await exists.save();
+          console.log(`✅ Updated existing seeded template: ${t.name}`);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Templates seed error:', e.message);
   }
 }
 
