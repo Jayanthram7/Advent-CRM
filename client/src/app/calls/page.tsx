@@ -905,12 +905,26 @@ function EditCallModal({ call, onClose, onUpdated }: { call: Call; onClose: () =
 
 // ─── Create Call Modal ───────────────────────────────────────────────────────
 function CreateCallModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const { user } = useAuth();
+  const [usersList, setUsersList] = useState<any[]>([]);
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
     secondaryPhone: '', company: '', licenseNumber: '',
-    leadSource: 'Other', address: '', reason: '', labels: ['Open']
+    leadSource: 'Other', address: '', reason: '', labels: ['Open'],
+    assignedTo: user?.id || ''
   });
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setForm(f => ({ ...f, assignedTo: f.assignedTo || user.id }));
+      if (user.role === 'Admin') {
+        api.get('/users')
+          .then(res => setUsersList(res.data || []))
+          .catch(err => console.error(err));
+      }
+    }
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -977,6 +991,19 @@ function CreateCallModal({ onClose, onCreated }: { onClose: () => void; onCreate
                 <select className="form-select" value={form.leadSource} onChange={e => set('leadSource', e.target.value)}>
                   {SOURCE_OPTIONS.map(s => <option key={s}>{s}</option>)}
                 </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Assign To</label>
+                {user?.role === 'Admin' ? (
+                  <select className="form-select" value={form.assignedTo} onChange={e => set('assignedTo', e.target.value)}>
+                    <option value="">Select User...</option>
+                    {usersList.map(u => (
+                      <option key={u._id} value={u._id}>{u.name} ({u.role})</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input className="form-input" value={user?.name || ''} readOnly style={{ background: '#f4f6fb', cursor: 'not-allowed' }} />
+                )}
               </div>
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                 <label className="form-label">Address</label>
@@ -1292,7 +1319,8 @@ function CallsPageContent() {
   const [pages, setPages] = useState(1);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const urlSearch = searchParams.get('search');
+  const [search, setSearch] = useState(urlSearch || '');
   const [showCreate, setShowCreate] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [sortBy, setSortBy] = useState('createdAt');
@@ -1320,13 +1348,21 @@ function CallsPageContent() {
     api.get('/users').then(r => setUsers(r.data)).catch(() => {});
   }, []);
 
+  // Update search state if URL search param changes
+  useEffect(() => {
+    if (urlSearch !== null) {
+      setSearch(urlSearch);
+    }
+  }, [urlSearch]);
 
   // Reset page when view changes
   useEffect(() => {
     setViewFilter(urlView || '');
     setPage(1);
-    setSearch('');
-  }, [urlView]);
+    if (!urlSearch) {
+      setSearch('');
+    }
+  }, [urlView, urlSearch]);
 
   const fetchCalls = useCallback(async () => {
     setLoading(true);

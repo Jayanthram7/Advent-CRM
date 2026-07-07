@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import TopBar from '@/components/TopBar';
 import api from '@/lib/api';
@@ -36,6 +37,7 @@ interface TaskRecord {
   callbackDate?: string;
   followUpDate?: string;
   installationDate?: string;
+  renewalDate?: string;
   createdAt: string;
   assignedTo?: {
     _id: string;
@@ -86,8 +88,19 @@ function TaskRowMenu({ record, onRefresh, users }: { record: TaskRecord; onRefre
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  useEffect(() => {
+    if (submenu === 'date_followup') {
+      setDate(record.followUpDate ? record.followUpDate.split('T')[0] : '');
+    } else if (submenu === 'date_install') {
+      const existingDate = record.source === 'tss' ? record.renewalDate : record.installationDate;
+      setDate(existingDate ? existingDate.split('T')[0] : '');
+    }
+  }, [submenu, record]);
+
   const getBaseUrl = (source: string, id: string) => {
-    return source === 'tss' ? `/tss/records/${id}` : `/${source}/${id}`;
+    if (source === 'tss') return `/tss/records/${id}`;
+    if (source === 'events') return `/events/records/${id}`;
+    return `/${source}/${id}`;
   };
 
   const saveLabels = async () => {
@@ -346,9 +359,22 @@ function TaskRowMenu({ record, onRefresh, users }: { record: TaskRecord; onRefre
   );
 }
 
-export default function TasksPage() {
-  const { user } = useAuth();
+function TasksPageContent() {
+  const { user, setSidebarCollapsed } = useAuth();
   const isAdminOrManager = user?.role === 'Admin' || user?.role === 'Manager';
+  const searchParams = useSearchParams();
+  const urlLabel = searchParams.get('label');
+  const urlUserId = searchParams.get('userId');
+
+  useEffect(() => {
+    const savedState = localStorage.getItem('sidebar_collapsed') === 'true';
+    setSidebarCollapsed(true, false);
+
+    return () => {
+      const currentPreference = localStorage.getItem('sidebar_collapsed') === 'true';
+      setSidebarCollapsed(currentPreference);
+    };
+  }, [setSidebarCollapsed]);
 
   const [records, setRecords] = useState<TaskRecord[]>([]);
   const [total, setTotal] = useState(0);
@@ -358,13 +384,13 @@ export default function TasksPage() {
 
   // Users for dropdown (Admin/Manager only)
   const [agents, setAgents] = useState<any[]>([]);
-  const [selectedAgentId, setSelectedAgentId] = useState<string>('');
+  const [selectedAgentId, setSelectedAgentId] = useState<string>(urlUserId || '');
 
   // Filters
   const [search, setSearch] = useState('');
   const [source, setSource] = useState('');
-  const [status, setStatus] = useState('Pending'); // default is Pending
-  const [filterLabel, setFilterLabel] = useState('');
+  const [status, setStatus] = useState(urlLabel === 'Review' ? '' : 'Pending');
+  const [filterLabel, setFilterLabel] = useState(urlLabel || '');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -420,8 +446,10 @@ export default function TasksPage() {
       .then(res => {
         setAgents(res.data);
         if (res.data && res.data.length > 0) {
-          const defaultUser = res.data.find((u: any) => u._id === user?.id) || res.data[0];
-          setSelectedAgentId(defaultUser._id);
+          if (!urlUserId) {
+            const defaultUser = res.data.find((u: any) => u._id === user?.id) || res.data[0];
+            setSelectedAgentId(defaultUser._id);
+          }
         }
       })
       .catch(err => {
@@ -473,6 +501,22 @@ export default function TasksPage() {
   useEffect(() => {
     setPage(1);
   }, [search, source, status, selectedAgentId, filterLabel, startDate, endDate]);
+
+  // Sync state with URL search param changes
+  useEffect(() => {
+    if (urlLabel) {
+      setFilterLabel(urlLabel);
+      if (urlLabel === 'Review') {
+        setStatus('');
+      }
+    }
+  }, [urlLabel]);
+
+  useEffect(() => {
+    if (urlUserId) {
+      setSelectedAgentId(urlUserId);
+    }
+  }, [urlUserId]);
 
   const handleClearFilters = () => {
     setSearch('');
@@ -988,5 +1032,13 @@ export default function TasksPage() {
         />
       )}
     </ProtectedLayout>
+  );
+}
+
+export default function TasksPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <TasksPageContent />
+    </Suspense>
   );
 }

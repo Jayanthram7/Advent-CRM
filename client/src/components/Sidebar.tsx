@@ -234,7 +234,7 @@ export default function Sidebar() {
           <span className="sidebar-item-text">Dashboard</span>
         </Link>
 
-        {!sidebarCollapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />}
+        {!sidebarCollapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />}
         <div className="sidebar-section-title">Sales</div>
 
         {/* Leads */}
@@ -317,10 +317,12 @@ export default function Sidebar() {
           <span className="sidebar-item-text">Tasks</span>
         </Link>
 
+
+
         {/* TSS Section */}
         {isAdmin && (
           <>
-            {!sidebarCollapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />}
+            {!sidebarCollapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />}
             <div className="sidebar-section-title">Operations</div>
 
             <Link
@@ -377,8 +379,18 @@ export default function Sidebar() {
 
         {isAdmin && (
           <>
-            {!sidebarCollapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />}
+            {!sidebarCollapsed && <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />}
             <div className="sidebar-section-title">Admin</div>
+
+            {/* Calendar */}
+            <Link
+              href="/calendar"
+              className={`sidebar-item ${pathname === '/calendar' ? 'active' : ''}`}
+              style={{ display: 'flex', alignItems: 'center', gap: 10 }}
+            >
+              <Calendar size={15} />
+              <span className="sidebar-item-text">Calendar</span>
+            </Link>
             <div
               onClick={() => {
                 if (pathname !== '/users') {
@@ -452,7 +464,7 @@ export default function Sidebar() {
       </nav>
 
       {/* User info */}
-      <div className="sidebar-user-container" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '12px 16px', display: 'flex', flexDirection: 'column', alignItems: sidebarCollapsed ? 'center' : 'stretch' }}>
+      <div className="sidebar-user-container" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '8px 12px', display: 'flex', flexDirection: 'column', alignItems: sidebarCollapsed ? 'center' : 'stretch' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, width: '100%', justifyContent: sidebarCollapsed ? 'center' : 'flex-start' }}>
           <div className="avatar" style={{ width: 30, height: 30, fontSize: 11, overflow: 'hidden' }}>
             {user?.email === 'jayanthramnithin@gmail.com' ? (

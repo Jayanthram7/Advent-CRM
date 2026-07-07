@@ -29,7 +29,7 @@ router.post('/templates', async (req, res) => {
     if (!name || !subject || !body) {
       return res.status(400).json({ message: 'Name, subject, and body are required' });
     }
-    
+
     let template;
     if (id) {
       template = await EmailTemplate.findByIdAndUpdate(id, { name, subject, body }, { new: true });
@@ -71,7 +71,7 @@ router.get('/contacts/tss', async (req, res) => {
     // Helper to extract email dynamically from TSS Map data
     const getTssEmail = (record) => {
       if (!record.data) return null;
-      const emailKey = Object.keys(record.data).find(k => 
+      const emailKey = Object.keys(record.data).find(k =>
         k.toLowerCase().includes('email') || k.toLowerCase().includes('e-mail')
       );
       return emailKey ? String(record.data[emailKey]).trim() : null;
@@ -95,7 +95,7 @@ router.get('/contacts/tss', async (req, res) => {
           return new Date(record.renewalDate);
         }
         if (record.data) {
-          const dateKey = Object.keys(record.data).find(k => 
+          const dateKey = Object.keys(record.data).find(k =>
             k.toLowerCase().includes('expiry') || k.toLowerCase().includes('renewal')
           );
           if (dateKey) {
@@ -175,7 +175,7 @@ router.get('/contacts', async (req, res) => {
     }
 
     const regex = new RegExp(search.trim(), 'i');
-    
+
     // Query Leads
     const leads = await Lead.find({
       $or: [
@@ -219,7 +219,7 @@ router.get('/contacts', async (req, res) => {
     const getTssEmail = (record) => {
       if (!record.data) return null;
       // Look for any keys containing "email" or "e-mail"
-      const emailKey = Object.keys(record.data).find(k => 
+      const emailKey = Object.keys(record.data).find(k =>
         k.toLowerCase().includes('email') || k.toLowerCase().includes('e-mail')
       );
       return emailKey ? String(record.data[emailKey]).trim() : null;
@@ -345,4 +345,5 @@ router.post('/send', async (req, res) => {
   }
 });
 
+module.exports = router;
 module.exports = router;

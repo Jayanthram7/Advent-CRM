@@ -14,6 +14,7 @@ const dashboardRoutes = require('./routes/dashboard');
 const tssRoutes = require('./routes/tss');
 const claimRoutes = require('./routes/claims');
 const emailRoutes = require('./routes/emails');
+const calendarRoutes = require('./routes/calendar');
 
 const app = express();
 
@@ -68,6 +69,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/tss', tssRoutes);
 app.use('/api/claims', claimRoutes);
 app.use('/api/emails', emailRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 app.get('/api/health', (req, res) => {
   const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
@@ -110,7 +112,7 @@ async function seedTemplates() {
         name: 'Tally License Expiry',
         subject: 'Action Required: Your Tally License is Expiring Soon',
         body: `<p><strong>Dear {{name}},</strong></p>
-<p>This is a friendly reminder that your Tally Prime license subscription is expiring in the next few days.</p>
+<p>This is a friendly reminder that your Tally Prime license subscription is <span style="color: #dc2626; font-weight: bold;">expiring in the next few days.</span></p>
 <p>To avoid any disruption to your accounting and business compliance operations, we recommend renewing your license before the expiry date.</p>
 <p>Please reply to this email or contact us at our numbers below, and our team will assist you with the renewal process immediately.</p>`
       },
@@ -151,7 +153,7 @@ if (!process.env.VERCEL) {
     console.log(`   Health: http://localhost:${PORT}/api/health`);
   });
   // Eagerly connect to MongoDB in local development for diagnostic logging
-  connectDB().catch(() => {});
+  connectDB().catch(() => { });
 }
 
 module.exports = app;

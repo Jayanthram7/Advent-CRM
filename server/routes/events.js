@@ -241,20 +241,6 @@ router.post('/records', async (req, res) => {
       performedBy: req.user._id
     });
 
-    // Optional: Send welcome email if email exists
-    if (email) {
-      try {
-        await sendEmail({
-          from: 'Advent Systems <jayanthramnithin@gmail.com>',
-          to: email,
-          subject: 'Welcome to Advent Systems',
-          html: `<h3>Dear ${contactPerson},</h3><p>Thank you for connecting with us at event exhibition. We look forward to working with you.</p>`
-        });
-      } catch (emailErr) {
-        console.error('Failed to send welcome email:', emailErr);
-      }
-    }
-
     res.status(201).json(record);
   } catch (err) {
     console.error('Create Event record error:', err);

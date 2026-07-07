@@ -289,7 +289,7 @@ router.post('/', async (req, res) => {
   try {
     const {
       firstName, lastName, email, phone, secondaryPhone,
-      company, licenseNumber, leadSource, address, city, country, labels, reason
+      company, licenseNumber, leadSource, address, city, country, labels, reason, assignedTo
     } = req.body;
 
     if (!firstName || !lastName) {
@@ -311,7 +311,7 @@ router.post('/', async (req, res) => {
       reason,
       labels: labels || ['Open'],
       createdBy: req.user._id,
-      assignedTo: req.user._id
+      assignedTo: assignedTo || req.user._id
     });
 
     // Log Activity: Creation

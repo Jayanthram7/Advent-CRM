@@ -426,4 +426,65 @@ router.post('/settings/verify', async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Server error' }); }
 });
 
+// POST /api/tss/records/:id/send-reminder - Send Tally license renewal reminder email
+router.post('/records/:id/send-reminder', async (req, res) => {
+  try {
+    const record = await TssRecord.findById(req.params.id);
+    if (!record) {
+      return res.status(404).json({ message: 'TSS record not found' });
+    }
+
+    // Extract email from record data Map
+    const getTssEmail = (rec) => {
+      if (!rec.data) return null;
+      const dataObj = rec.data instanceof Map ? Object.fromEntries(rec.data) : rec.data;
+      const emailKey = Object.keys(dataObj).find(k => 
+        k.toLowerCase().includes('email') || k.toLowerCase().includes('e-mail')
+      );
+      return emailKey ? String(dataObj[emailKey]).trim() : null;
+    };
+
+    const email = getTssEmail(record);
+    if (!email) {
+      return res.status(400).json({ message: 'Customer email address not found in this record.' });
+    }
+
+    const EmailTemplate = require('../models/EmailTemplate');
+    const sendEmail = require('../utils/mailer');
+    
+    let subject = 'Action Required: Your Tally License is Expiring Soon';
+    let body = `<p><strong>Dear ${record.customerName || 'Customer'},</strong></p>
+<p>This is a friendly reminder that your Tally Prime license subscription is <span style="color: #dc2626; font-weight: bold;">expiring in the next few days.</span></p>
+<p>To avoid any disruption to your accounting and business compliance operations, we recommend renewing your license before the expiry date.</p>
+<p>Please reply to this email or contact us at our numbers below, and our team will assist you with the renewal process immediately.</p>`;
+
+    const template = await EmailTemplate.findOne({ name: 'Tally License Expiry' });
+    if (template) {
+      subject = template.subject;
+      body = template.body.replace(/\{\{name\}\}/g, record.customerName || 'Customer');
+    } else {
+      body = body.replace(/\{\{name\}\}/g, record.customerName || 'Customer');
+    }
+
+    // Send email
+    await sendEmail({
+      to: email,
+      subject,
+      html: body
+    });
+
+    // Add note to record
+    record.notes.push({
+      content: `License renewal reminder email sent successfully to ${email}.`,
+      authorName: req.user.name || 'System'
+    });
+    await record.save();
+
+    res.json({ message: `Reminder email successfully sent to ${email}` });
+  } catch (err) {
+    console.error('Error sending renewal reminder:', err);
+    res.status(500).json({ message: 'Failed to send reminder email. Please verify SMTP configuration.' });
+  }
+});
+
 module.exports = router;

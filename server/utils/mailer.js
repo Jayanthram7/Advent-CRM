@@ -96,7 +96,7 @@ const sendEmail = async ({ from, to, subject, html, attachments }) => {
     cid: 'signaturelogo'
   };
 
-  const finalAttachments = attachments 
+  const finalAttachments = attachments
     ? [...attachments, signatureAttachment]
     : [signatureAttachment];
 

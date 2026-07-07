@@ -4,11 +4,12 @@ import ProtectedLayout from '@/components/ProtectedLayout';
 import TopBar from '@/components/TopBar';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import { ChevronLeft, ChevronRight, X, FileText, Search, Database, MoreVertical, Tag, Clock, Calendar, CheckCircle, BarChart3, Filter, Trash2, RefreshCw, Users, AlertCircle, Edit } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, FileText, Search, Database, MoreVertical, Tag, Clock, Calendar, CheckCircle, BarChart3, Filter, Trash2, RefreshCw, Users, AlertCircle, Edit, Send, MessageCircle, Mail } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import AnalyticsModalComponent from '@/components/AnalyticsModal';
+import { useSearchParams } from 'next/navigation';
 
 const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Completed', 'Closed'];
 const LABEL_CLASSES: Record<string, string> = {
@@ -122,6 +123,22 @@ function RowMenu({ record, onRefresh, users }: { record: TssRecord; onRefresh: (
     } catch { toast.error('Failed to assign record'); }
   };
 
+  const [sendingReminder, setSendingReminder] = useState(false);
+
+  const sendReminder = async () => {
+    setSendingReminder(true);
+    try {
+      const res = await api.post(`/tss/records/${record._id}/send-reminder`);
+      toast.success(res.data.message || 'Reminder email sent successfully!');
+      onRefresh();
+      setOpen(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to send reminder email');
+    } finally {
+      setSendingReminder(false);
+    }
+  };
+
   const currentAssignedId = record.assignedTo && typeof record.assignedTo === 'object' ? (record.assignedTo as any)._id : record.assignedTo;
 
   return (
@@ -143,6 +160,14 @@ function RowMenu({ record, onRefresh, users }: { record: TssRecord; onRefresh: (
               {record.status !== 'Closed' && user?.role === 'Admin' && (
                 <div className="dropdown-item" onClick={e => { e.stopPropagation(); closeRecord(); }}><CheckCircle size={14} />Mark as Completed</div>
               )}
+              <div 
+                className="dropdown-item" 
+                onClick={e => { e.stopPropagation(); if (!sendingReminder) sendReminder(); }}
+                style={{ opacity: sendingReminder ? 0.6 : 1, cursor: sendingReminder ? 'not-allowed' : 'pointer' }}
+              >
+                <Send size={14} />
+                {sendingReminder ? 'Sending...' : 'Send Reminder Mail'}
+              </div>
               <div className="dropdown-item" onClick={e => { e.stopPropagation(); setNoteOpen(true); }}><FileText size={14} />Add Note</div>
               {user?.role !== 'Agent' && (
                 <>
@@ -236,6 +261,35 @@ function RowMenu({ record, onRefresh, users }: { record: TssRecord; onRefresh: (
 export function RecordDrawer({ record, defaultTab = 'details', onClose, onRefresh }: { record: TssRecord; defaultTab?: 'details' | 'notes'; onClose: () => void; onRefresh?: (updatedRecord?: TssRecord) => void }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'Admin';
+
+  const getEmailFromRecord = (rec: TssRecord) => {
+    if (!rec.data) return null;
+    const emailKey = Object.keys(rec.data).find(k => k.toLowerCase().includes('email'));
+    return emailKey ? String(rec.data[emailKey]) : null;
+  };
+
+  const handleWhatsApp = () => {
+    if (!record.mobileNumber) {
+      toast.error('No mobile number available');
+      return;
+    }
+    const cleanPhone = record.mobileNumber.replace(/\D/g, '');
+    const message = encodeURIComponent(`Hi ${record.customerName || ''}, this is from Advent Systems regarding your Tally support...`);
+    const waUrl = `https://wa.me/${cleanPhone}?text=${message}`;
+    window.open(waUrl, '_blank');
+  };
+
+  const handleEmail = () => {
+    const email = getEmailFromRecord(record);
+    if (!email) {
+      toast.error('No email address available');
+      return;
+    }
+    const subject = encodeURIComponent('Support from Advent Systems');
+    const body = encodeURIComponent(`Hi ${record.customerName || ''},\n\nThis is regarding your Tally service...`);
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}&body=${body}`;
+    window.open(gmailUrl, '_blank');
+  };
   const [showEdit, setShowEdit] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'notes'>(defaultTab);
 
@@ -273,6 +327,57 @@ export function RecordDrawer({ record, defaultTab = 'details', onClose, onRefres
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {record.mobileNumber && (
+                <button 
+                  onClick={handleWhatsApp}
+                  title="Contact via WhatsApp"
+                  style={{ 
+                    background: '#25D366', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: 8, 
+                    padding: '6px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 4px 12px rgba(37, 211, 102, 0.25)'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                  onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                  <MessageCircle size={14} fill="white" />
+                  WhatsApp
+                </button>
+              )}
+              {getEmailFromRecord(record) && (
+                <button 
+                  onClick={handleEmail}
+                  title="Contact via Email"
+                  style={{ 
+                    background: '#EBF5FF', 
+                    color: '#0070F3', 
+                    border: '1px solid #D1E9FF', 
+                    borderRadius: 8, 
+                    padding: '6px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = '#D1E9FF'}
+                  onMouseOut={e => e.currentTarget.style.background = '#EBF5FF'}
+                >
+                  <Mail size={14} />
+                  Email
+                </button>
+              )}
               <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4, borderRadius: 6 }}><X size={20} /></button>
             </div>
           </div>
@@ -465,13 +570,15 @@ function EditTssRecordModal({ record, onClose, onUpdated }: { record: TssRecord;
 export default function TssDatasetPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams ? (searchParams.get('search') || '') : '';
   
   const [records, setRecords] = useState<TssRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
   const [viewFilter, setViewFilter] = useState(''); // open, followup, closed, dateset
   const [tickedIds, setTickedIds] = useState<Record<string, boolean>>({});
   const [users, setUsers] = useState<any[]>([]);
@@ -543,6 +650,15 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
   };
 
   useEffect(() => { fetchRecords(page, search, viewFilter); }, [id, page, viewFilter, startDate, endDate]);
+
+  useEffect(() => {
+    if (searchParams) {
+      const q = searchParams.get('search') || '';
+      setSearch(q);
+      setPage(1);
+      fetchRecords(1, q, viewFilter);
+    }
+  }, [id, searchParams]);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);

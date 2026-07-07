@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import api from '@/lib/api';
 
 interface User {
@@ -21,6 +21,7 @@ interface AuthContextType {
   isManager: boolean;
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean, persist?: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,13 +39,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const toggleSidebar = () => {
+  const toggleSidebar = useCallback(() => {
     setSidebarCollapsed(prev => {
       const next = !prev;
       localStorage.setItem('sidebar_collapsed', String(next));
       return next;
     });
-  };
+  }, []);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
@@ -85,6 +86,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const handleSetSidebarCollapsed = useCallback((collapsed: boolean, persist = true) => {
+    setSidebarCollapsed(collapsed);
+    if (persist) {
+      localStorage.setItem('sidebar_collapsed', String(collapsed));
+    }
+  }, []);
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -97,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isManager: user?.role === 'Manager' || user?.role === 'Admin',
       sidebarCollapsed,
       toggleSidebar,
+      setSidebarCollapsed: handleSetSidebarCollapsed
     }}>
       {children}
     </AuthContext.Provider>

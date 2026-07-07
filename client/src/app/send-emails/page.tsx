@@ -1,12 +1,13 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import ProtectedLayout from '@/components/ProtectedLayout';
 import TopBar from '@/components/TopBar';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import { 
-  Search, X, Plus, Trash2, Users, Send, CheckCircle, AlertTriangle, FileText, Edit2
+import {
+  Search, X, Plus, Trash2, Users, Send, CheckCircle, AlertTriangle, FileText, Edit2, Bold, Italic
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface Contact {
   name: string;
@@ -28,6 +29,93 @@ export default function SendEmailsPage() {
   const [searchResults, setSearchResults] = useState<Contact[]>([]);
   const [selectedRecipients, setSelectedRecipients] = useState<Contact[]>([]);
   const [searching, setSearching] = useState(false);
+
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  const execCommand = (command: string, value: string = '') => {
+    document.execCommand(command, false, value);
+    if (editorRef.current) {
+      setBody(editorRef.current.innerHTML);
+    }
+  };
+
+  // Download Excel Format
+  const downloadTemplate = () => {
+    const wsData = [
+      ['Name', 'Email', 'Phone'],
+      ['John Doe', 'john.doe@example.com', '9842276297'],
+      ['Jane Smith', 'jane.smith@example.com', '9965573231']
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Recipients');
+    XLSX.writeFile(wb, 'email_recipients_format.xlsx');
+    toast.success('Recipients format downloaded');
+  };
+
+  // Handle Excel Import
+  const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        if (jsonData.length === 0) {
+          toast.error('The uploaded Excel sheet is empty.');
+          return;
+        }
+
+        const importedContacts: Contact[] = [];
+        jsonData.forEach(row => {
+          const nameKey = Object.keys(row).find(k => k.toLowerCase().includes('name'));
+          const emailKey = Object.keys(row).find(k => k.toLowerCase().includes('email') || k.toLowerCase().includes('mail'));
+          const phoneKey = Object.keys(row).find(k => k.toLowerCase().includes('phone') || k.toLowerCase().includes('mobile') || k.toLowerCase().includes('contact'));
+
+          const name = nameKey ? String(row[nameKey]).trim() : '';
+          const email = emailKey ? String(row[emailKey]).trim() : '';
+          const phone = phoneKey ? String(row[phoneKey]).trim() : '';
+
+          if (email && name) {
+            importedContacts.push({
+              name,
+              email,
+              phone,
+              source: 'Excel Import'
+            });
+          }
+        });
+
+        if (importedContacts.length === 0) {
+          toast.error('Could not find columns for Name and Email in the uploaded file.');
+          return;
+        }
+
+        const newRecipients = [...selectedRecipients];
+        let addedCount = 0;
+        importedContacts.forEach(contact => {
+          if (!newRecipients.some(r => r.email.toLowerCase().trim() === contact.email.toLowerCase().trim())) {
+            newRecipients.push(contact);
+            addedCount++;
+          }
+        });
+
+        setSelectedRecipients(newRecipients);
+        toast.success(`Successfully imported ${addedCount} contacts from Excel`);
+        e.target.value = '';
+      } catch (err) {
+        console.error('Failed to parse Excel file', err);
+        toast.error('Failed to parse Excel file.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
 
   // State for TSS filtering
   const [tssLabelFilter, setTssLabelFilter] = useState('All');
@@ -96,12 +184,18 @@ export default function SendEmailsPage() {
     if (!id) {
       setSubject('');
       setBody('');
+      if (editorRef.current) {
+        editorRef.current.innerHTML = '';
+      }
       return;
     }
     const selected = templates.find(t => t._id === id);
     if (selected) {
       setSubject(selected.subject);
       setBody(selected.body);
+      if (editorRef.current) {
+        editorRef.current.innerHTML = selected.body;
+      }
     }
   };
 
@@ -181,6 +275,9 @@ export default function SendEmailsPage() {
       setSelectedTemplateId('');
       setSubject('');
       setBody('');
+      if (editorRef.current) {
+        editorRef.current.innerHTML = '';
+      }
       fetchTemplates();
     } catch (err) {
       toast.error('Failed to delete template');
@@ -216,7 +313,7 @@ export default function SendEmailsPage() {
       for (let i = 0; i < selectedRecipients.length; i++) {
         const recipient = selectedRecipients[i];
         setSendProgress({ current: i + 1, total: selectedRecipients.length });
-        
+
         try {
           await api.post('/emails/send', {
             recipients: [recipient],
@@ -232,7 +329,7 @@ export default function SendEmailsPage() {
           });
           failCount++;
         }
-        
+
         // 200ms delay between API calls to prevent rapid firing
         await new Promise(resolve => setTimeout(resolve, 200));
       }
@@ -246,6 +343,11 @@ export default function SendEmailsPage() {
       if (failCount === 0) {
         toast.success(`Broadcast sent successfully to all ${successCount} recipients!`);
         setSelectedRecipients([]);
+        setSubject('');
+        setBody('');
+        if (editorRef.current) {
+          editorRef.current.innerHTML = '';
+        }
       } else {
         toast.error(`Broadcast completed. ${successCount} sent, ${failCount} failed.`);
       }
@@ -301,7 +403,7 @@ export default function SendEmailsPage() {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
-    
+
     const contacts = await getFilteredTssContacts({
       label: 'All',
       dateField: 'renewalDate',
@@ -315,7 +417,7 @@ export default function SendEmailsPage() {
   const addFilteredTss = async () => {
     let start = '';
     let end = '';
-    
+
     if (tssDateRange === 'ThisMonth') {
       const now = new Date();
       start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -334,7 +436,7 @@ export default function SendEmailsPage() {
       endDateObj.setHours(23, 59, 59, 999);
       end = endDateObj.toISOString();
     }
-    
+
     const contacts = await getFilteredTssContacts({
       label: tssLabelFilter,
       dateField: tssDateRange !== 'All' ? tssDateField : '',
@@ -356,7 +458,16 @@ export default function SendEmailsPage() {
 
   return (
     <ProtectedLayout requiredRole="Admin">
-      <TopBar title="Send Emails" onRefresh={fetchTemplates} />
+      <TopBar title="Send Emails" onRefresh={fetchTemplates}>
+        <button
+          onClick={downloadTemplate}
+          className="btn-secondary"
+          style={{ padding: '6px 12px', fontSize: 13, background: 'white', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', border: '1px solid #cbd5e1', borderRadius: 6 }}
+          title="Download Excel Format"
+        >
+          <FileText size={15} /> Download Format
+        </button>
+      </TopBar>
 
       <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 24 }}>
         {/* Left Column: Recipients Selection */}
@@ -366,7 +477,7 @@ export default function SendEmailsPage() {
             <h3 style={{ fontSize: 15, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Users size={18} style={{ color: '#1a73e8' }} /> Select Recipients
             </h3>
-            
+
             {/* Search Input */}
             <div style={{ position: 'relative' }}>
               <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
@@ -399,7 +510,7 @@ export default function SendEmailsPage() {
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
                       <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Search Results ({searchResults.length})</span>
-                      <button 
+                      <button
                         onClick={addAllSearchResults}
                         style={{ background: 'none', border: 'none', color: '#1a73e8', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                       >
@@ -431,14 +542,14 @@ export default function SendEmailsPage() {
                           fontWeight: 600,
                           padding: '2px 6px',
                           borderRadius: 4,
-                          background: 
-                            contact.source === 'Lead' ? '#e0f2fe' : 
-                            contact.source === 'Quiz User' ? '#f3e8ff' : 
-                            contact.source === 'Event' ? '#ffedd5' : '#dcfce7',
-                          color: 
-                            contact.source === 'Lead' ? '#0369a1' : 
-                            contact.source === 'Quiz User' ? '#6b21a8' : 
-                            contact.source === 'Event' ? '#c2410c' : '#15803d'
+                          background:
+                            contact.source === 'Lead' ? '#e0f2fe' :
+                              contact.source === 'Quiz User' ? '#f3e8ff' :
+                                contact.source === 'Event' ? '#ffedd5' : '#dcfce7',
+                          color:
+                            contact.source === 'Lead' ? '#0369a1' :
+                              contact.source === 'Quiz User' ? '#6b21a8' :
+                                contact.source === 'Event' ? '#c2410c' : '#15803d'
                         }}>
                           {contact.source}
                         </span>
@@ -449,12 +560,45 @@ export default function SendEmailsPage() {
               </div>
             )}
 
+            {/* Import Recipients from Excel */}
+            <div style={{ padding: 12, border: '1px solid #cbd5e1', borderRadius: 8, background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <FileText size={16} style={{ color: '#10b981' }} /> Import Recipients from Excel
+              </div>
+
+              <label
+                style={{
+                  border: '2px dashed #cbd5e1',
+                  borderRadius: 6,
+                  padding: '12px 10px',
+                  textAlign: 'center',
+                  background: 'white',
+                  cursor: 'pointer',
+                  display: 'block',
+                  fontSize: 12,
+                  color: '#64748b',
+                  transition: 'border-color 0.15s'
+                }}
+                onMouseOver={e => e.currentTarget.style.borderColor = '#10b981'}
+                onMouseOut={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+              >
+                <span>Click to upload Excel file (.xlsx, .xls, .csv)</span>
+                <input
+                  type="file"
+                  accept=".xlsx, .xls, .csv"
+                  style={{ display: 'none' }}
+                  onChange={handleExcelImport}
+                  disabled={sending}
+                />
+              </label>
+            </div>
+
             {/* TSS Bulk Add Section */}
             <div style={{ padding: 12, border: '1px solid #cbd5e1', borderRadius: 8, background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Plus size={16} style={{ color: '#1a73e8' }} /> Add TSS Contacts in Bulk
               </div>
-              
+
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   type="button"
@@ -481,7 +625,7 @@ export default function SendEmailsPage() {
                 <summary style={{ cursor: 'pointer', color: '#1a73e8', fontWeight: 600, outline: 'none', userSelect: 'none' }}>
                   Filter TSS by label & date
                 </summary>
-                
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 11, color: '#64748b', marginBottom: 4, fontWeight: 500 }}>TSS Label</label>
@@ -642,7 +786,7 @@ export default function SendEmailsPage() {
               )}
             </div>
           </div>
-          
+
           {/* Sending Progress Card */}
           {sending && (
             <div className="card" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: 'white', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -650,7 +794,7 @@ export default function SendEmailsPage() {
                 <span style={{ fontSize: 14, fontWeight: 500, color: '#94a3b8' }}>Sending Broadcast Progress</span>
                 <span style={{ fontSize: 14, fontWeight: 600, color: '#38bdf8' }}>{sendProgress.current} / {sendProgress.total}</span>
               </div>
-              
+
               {/* Progress Bar Container */}
               <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 10, height: 8, width: '100%', overflow: 'hidden' }}>
                 <div style={{
@@ -660,7 +804,7 @@ export default function SendEmailsPage() {
                   transition: 'width 0.2s ease-out'
                 }} />
               </div>
-              
+
               <div style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div className="spinner" style={{ width: 12, height: 12, borderColor: '#38bdf8 transparent #38bdf8 transparent' }} />
                 Pacing broadcast delivery sequentially to prevent Gmail rate limits...
@@ -712,7 +856,7 @@ export default function SendEmailsPage() {
               <FileText size={18} style={{ color: '#1a73e8' }} />
               <h3 style={{ fontSize: 15, fontWeight: 600, color: '#1e293b', margin: 0 }}>Template Selection</h3>
             </div>
-            
+
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <select
                 className="form-input"
@@ -726,7 +870,7 @@ export default function SendEmailsPage() {
                   <option key={t._id} value={t._id}>{t.name}</option>
                 ))}
               </select>
-              
+
               {selectedTemplateId && (
                 <button
                   onClick={handleDeleteTemplate}
@@ -738,7 +882,7 @@ export default function SendEmailsPage() {
                   <Trash2 size={13} />
                 </button>
               )}
-              
+
               <button
                 onClick={openSaveModal}
                 className="btn-secondary"
@@ -764,21 +908,85 @@ export default function SendEmailsPage() {
             </div>
 
             <div className="form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label className="form-label">Email Body (HTML Supported)</label>
+              <style dangerouslySetInnerHTML={{
+                __html: `
+                .rich-editor:empty::before {
+                  content: "Write your email body here... (use {{name}} to personalize)";
+                  color: #94a3b8;
+                  pointer-events: none;
+                }
+              `}} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <label className="form-label">Email Body</label>
                 <span style={{ fontSize: 11, color: '#1a73e8', fontWeight: 500 }}>
                   Tip: Use <code>{"{{name}}"}</code> to personalize
                 </span>
               </div>
-              <textarea
-                className="form-input"
-                value={body}
-                onChange={e => setBody(e.target.value)}
-                placeholder="<h3>Dear {{name}},</h3><p>Write your email body here...</p>"
-                rows={14}
-                style={{ fontFamily: 'monospace', fontSize: 13, resize: 'vertical' }}
-                disabled={sending}
-              />
+
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                {/* Toolbar */}
+                <div style={{ background: '#f8fafc', borderBottom: '1px solid #cbd5e1', padding: '6px 8px', display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => execCommand('bold')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 6,
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
+                    onMouseOut={e => e.currentTarget.style.background = 'none'}
+                    title="Bold"
+                  >
+                    <Bold size={16} style={{ color: '#334155' }} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => execCommand('italic')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 6,
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
+                    onMouseOut={e => e.currentTarget.style.background = 'none'}
+                    title="Italic"
+                  >
+                    <Italic size={16} style={{ color: '#334155' }} />
+                  </button>
+                </div>
+
+                {/* Editable Area */}
+                <div
+                  ref={editorRef}
+                  contentEditable
+                  className="rich-editor"
+                  onInput={() => setBody(editorRef.current?.innerHTML || '')}
+                  style={{
+                    padding: 16,
+                    minHeight: 250,
+                    maxHeight: 400,
+                    overflowY: 'auto',
+                    background: 'white',
+                    outline: 'none',
+                    fontFamily: "'DM Sans', Arial, sans-serif",
+                    fontSize: 14,
+                    color: '#334155',
+                    lineHeight: 1.6
+                  }}
+                  disabled={sending}
+                />
+              </div>
             </div>
           </div>
 

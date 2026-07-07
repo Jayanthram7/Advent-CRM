@@ -1275,7 +1275,7 @@ function EventPageContent({ id }: { id: string }) {
   const [pages, setPages] = useState(1);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams ? (searchParams.get('search') || '') : '');
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
@@ -1310,8 +1310,9 @@ function EventPageContent({ id }: { id: string }) {
   useEffect(() => {
     setViewFilter(urlView || '');
     setPage(1);
-    setSearch('');
-  }, [urlView]);
+    const q = searchParams ? (searchParams.get('search') || '') : '';
+    setSearch(q);
+  }, [urlView, searchParams]);
 
   const fetchRecords = useCallback(async () => {
     setLoading(true);
