@@ -934,16 +934,17 @@ export default function SendEmailsPage() {
                       border: 'none',
                       padding: 6,
                       borderRadius: 4,
-                      cursor: 'pointer',
+                      cursor: sending ? 'not-allowed' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}
-                    onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
+                    onMouseOver={e => e.currentTarget.style.background = sending ? 'none' : '#e2e8f0'}
                     onMouseOut={e => e.currentTarget.style.background = 'none'}
                     title="Bold"
+                    disabled={sending}
                   >
-                    <Bold size={16} style={{ color: '#334155' }} />
+                    <Bold size={16} style={{ color: sending ? '#94a3b8' : '#334155' }} />
                   </button>
                   <button
                     type="button"
@@ -953,23 +954,24 @@ export default function SendEmailsPage() {
                       border: 'none',
                       padding: 6,
                       borderRadius: 4,
-                      cursor: 'pointer',
+                      cursor: sending ? 'not-allowed' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}
-                    onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
+                    onMouseOver={e => e.currentTarget.style.background = sending ? 'none' : '#e2e8f0'}
                     onMouseOut={e => e.currentTarget.style.background = 'none'}
                     title="Italic"
+                    disabled={sending}
                   >
-                    <Italic size={16} style={{ color: '#334155' }} />
+                    <Italic size={16} style={{ color: sending ? '#94a3b8' : '#334155' }} />
                   </button>
                 </div>
 
                 {/* Editable Area */}
                 <div
                   ref={editorRef}
-                  contentEditable
+                  contentEditable={!sending}
                   className="rich-editor"
                   onInput={() => setBody(editorRef.current?.innerHTML || '')}
                   style={{
@@ -977,14 +979,14 @@ export default function SendEmailsPage() {
                     minHeight: 250,
                     maxHeight: 400,
                     overflowY: 'auto',
-                    background: 'white',
+                    background: sending ? '#f8fafc' : 'white',
+                    cursor: sending ? 'not-allowed' : 'text',
                     outline: 'none',
                     fontFamily: "'DM Sans', Arial, sans-serif",
                     fontSize: 14,
-                    color: '#334155',
+                    color: sending ? '#94a3b8' : '#334155',
                     lineHeight: 1.6
                   }}
-                  disabled={sending}
                 />
               </div>
             </div>
