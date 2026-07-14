@@ -19,6 +19,14 @@ function obscureKey(key) {
   return `${key.slice(0, 6)}...${key.slice(-4)}`;
 }
 
+// Validate that a key is not a masked placeholder or empty/corrupted by copy-paste masking
+function isSecretValid(key) {
+  if (!key) return false;
+  if (key.includes('...')) return false;
+  if (/^[*\-•\s]+$/.test(key)) return false;
+  return true;
+}
+
 // GET /api/whatsapp/settings - Admin Only
 router.get('/settings', authMiddleware, roleMiddleware('Admin'), async (req, res) => {
   try {
@@ -60,14 +68,14 @@ router.post('/settings', authMiddleware, roleMiddleware('Admin'), async (req, re
 
     settings.twilioAccountSid = twilioAccountSid !== undefined ? twilioAccountSid : settings.twilioAccountSid;
     
-    // Only update tokens if they are not obscured placeholders
-    if (twilioAuthToken && !twilioAuthToken.includes('...')) {
+    // Only update tokens if they are valid, non-placeholder keys
+    if (isSecretValid(twilioAuthToken)) {
       settings.twilioAuthToken = twilioAuthToken;
     }
     
     settings.twilioPhoneNumber = twilioPhoneNumber !== undefined ? twilioPhoneNumber : settings.twilioPhoneNumber;
     
-    if (geminiApiKey && !geminiApiKey.includes('...')) {
+    if (isSecretValid(geminiApiKey)) {
       settings.geminiApiKey = geminiApiKey;
     }
 
