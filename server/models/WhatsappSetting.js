@@ -19,7 +19,7 @@ const whatsappSettingSchema = new mongoose.Schema({
   },
   geminiModel: {
     type: String,
-    default: 'gemini-2.0-flash'
+    default: 'gemini-3.1-flash-lite'
   },
   context: {
     type: String,

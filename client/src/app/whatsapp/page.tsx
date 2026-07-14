@@ -34,7 +34,7 @@ export default function WhatsappPage() {
   const [twilioAuthToken, setTwilioAuthToken] = useState('');
   const [twilioPhoneNumber, setTwilioPhoneNumber] = useState('');
   const [geminiApiKey, setGeminiApiKey] = useState('');
-  const [geminiModel, setGeminiModel] = useState('gemini-2.0-flash');
+  const [geminiModel, setGeminiModel] = useState('gemini-3.1-flash-lite');
   const [context, setContext] = useState('');
   const [isEnabled, setIsEnabled] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -385,7 +385,8 @@ export default function WhatsappPage() {
                   onChange={(e) => setGeminiModel(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
                 >
-                  <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recommended - Extremely responsive)</option>
+                  <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite (Recommended - High Quota)</option>
+                  <option value="gemini-2.0-flash">Gemini 2.0 Flash (Extremely responsive)</option>
                   <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                   <option value="gemini-3.5-flash">Gemini 3.5 Flash (State of the Art)</option>
                   <option value="gemini-1.5-flash">Gemini 1.5 Flash (Legacy)</option>
