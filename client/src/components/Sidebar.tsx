@@ -6,7 +6,7 @@ import {
   Home, Users, Target, LogOut,
   ChevronDown, ChevronRight, ChevronLeft, Circle,
   Inbox, Clock, Calendar, CheckCircle2,
-  Database, Upload, FileText, X, Phone, Building2, Contact, CheckSquare, Award, Mail
+  Database, Upload, FileText, X, Phone, Building2, Contact, CheckSquare, Award, Mail, MessageSquare
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -458,6 +458,23 @@ export default function Sidebar() {
             >
               <Mail size={15} />
               <span className="sidebar-item-text">Send Emails</span>
+            </div>
+            <div
+              onClick={() => {
+                if (pathname !== '/whatsapp') {
+                  if (user?.email === 'jayanthramnithin@gmail.com') {
+                    router.push('/whatsapp');
+                  } else {
+                    setAdminTargetRoute('/whatsapp');
+                    setAdminAuthStep(1);
+                  }
+                }
+              }}
+              className={`sidebar-item ${pathname === '/whatsapp' ? 'active' : ''}`}
+              style={{ cursor: 'pointer', display: 'flex', justifyContent: sidebarCollapsed ? 'center' : 'flex-start', marginTop: 4 }}
+            >
+              <MessageSquare size={15} />
+              <span className="sidebar-item-text">WhatsApp</span>
             </div>
           </>
         )}

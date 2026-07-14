@@ -15,6 +15,7 @@ const tssRoutes = require('./routes/tss');
 const claimRoutes = require('./routes/claims');
 const emailRoutes = require('./routes/emails');
 const calendarRoutes = require('./routes/calendar');
+const whatsappRoutes = require('./routes/whatsapp');
 
 const app = express();
 
@@ -70,6 +71,7 @@ app.use('/api/tss', tssRoutes);
 app.use('/api/claims', claimRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 app.get('/api/health', (req, res) => {
   const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
