@@ -39,6 +39,7 @@ router.get('/settings', authMiddleware, roleMiddleware('Admin'), async (req, res
     // Convert to JSON and obscure keys
     const settingsJSON = settings.toJSON();
     settingsJSON.twilioAuthToken = settings.twilioAuthToken ? obscureKey(settings.twilioAuthToken) : '';
+    settingsJSON.metaAccessToken = settings.metaAccessToken ? obscureKey(settings.metaAccessToken) : '';
     settingsJSON.geminiApiKey = settings.geminiApiKey ? obscureKey(settings.geminiApiKey) : '';
     
     res.json(settingsJSON);
@@ -52,6 +53,11 @@ router.get('/settings', authMiddleware, roleMiddleware('Admin'), async (req, res
 router.post('/settings', authMiddleware, roleMiddleware('Admin'), async (req, res) => {
   try {
     const {
+      provider,
+      metaPhoneNumberId,
+      metaAccessToken,
+      metaVerifyToken,
+      metaBusinessAccountId,
       twilioAccountSid,
       twilioAuthToken,
       twilioPhoneNumber,
@@ -65,6 +71,16 @@ router.post('/settings', authMiddleware, roleMiddleware('Admin'), async (req, re
     if (!settings) {
       settings = new WhatsappSetting();
     }
+
+    settings.provider = provider !== undefined ? provider : settings.provider;
+    settings.metaPhoneNumberId = metaPhoneNumberId !== undefined ? metaPhoneNumberId : settings.metaPhoneNumberId;
+    
+    if (isSecretValid(metaAccessToken)) {
+      settings.metaAccessToken = metaAccessToken;
+    }
+    
+    settings.metaVerifyToken = metaVerifyToken !== undefined ? metaVerifyToken : settings.metaVerifyToken;
+    settings.metaBusinessAccountId = metaBusinessAccountId !== undefined ? metaBusinessAccountId : settings.metaBusinessAccountId;
 
     settings.twilioAccountSid = twilioAccountSid !== undefined ? twilioAccountSid : settings.twilioAccountSid;
     
@@ -87,6 +103,7 @@ router.post('/settings', authMiddleware, roleMiddleware('Admin'), async (req, re
 
     const responseJSON = settings.toJSON();
     responseJSON.twilioAuthToken = settings.twilioAuthToken ? obscureKey(settings.twilioAuthToken) : '';
+    responseJSON.metaAccessToken = settings.metaAccessToken ? obscureKey(settings.metaAccessToken) : '';
     responseJSON.geminiApiKey = settings.geminiApiKey ? obscureKey(settings.geminiApiKey) : '';
 
     res.json({ message: 'Settings saved successfully', settings: responseJSON });
@@ -200,42 +217,101 @@ Answer the user based ONLY on the context above. If you do not know the answer, 
   }
 });
 
-// POST /api/whatsapp/webhook - Public Webhook for Twilio
+// GET /api/whatsapp/webhook - Verification endpoint for Meta Cloud API
+router.get('/webhook', async (req, res) => {
+  try {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    const settings = await WhatsappSetting.findOne();
+    const expectedToken = settings?.metaVerifyToken || 'advent_verify_token';
+
+    if (mode && token) {
+      if (mode === 'subscribe' && token === expectedToken) {
+        console.log('✅ Meta Webhook verified successfully');
+        return res.status(200).send(challenge);
+      } else {
+        console.warn('❌ Meta Webhook verification failed: Token mismatch');
+        return res.status(403).send('Verification token mismatch');
+      }
+    }
+    res.status(400).send('Missing hub parameters');
+  } catch (err) {
+    console.error('Error verifying Meta webhook:', err);
+    res.status(500).send('Internal server error');
+  }
+});
+
+// POST /api/whatsapp/webhook - Public Webhook for Twilio & Meta
 router.post('/webhook', urlencodedParser, async (req, res) => {
   try {
-    const { From, Body } = req.body;
-    if (!From || !Body) {
-      console.warn('Twilio webhook called without From or Body');
-      return res.status(400).send('Missing From or Body parameters');
-    }
-
-    // Retrieve active settings
+    // 1. Retrieve active settings
     const settings = await WhatsappSetting.findOne();
     if (!settings || !settings.isEnabled) {
       console.log('WhatsApp Agent is disabled or not configured');
+      if (req.body && req.body.object === 'whatsapp_business_account') {
+        return res.status(200).send('Disabled');
+      }
       res.type('text/xml');
       return res.send('<Response></Response>');
     }
 
-    if (!settings.geminiApiKey || !settings.twilioAccountSid || !settings.twilioAuthToken || !settings.twilioPhoneNumber) {
-      console.warn('WhatsApp Agent credentials not fully configured');
+    if (!settings.geminiApiKey) {
+      console.warn('WhatsApp Agent Gemini API key not configured');
+      if (req.body && req.body.object === 'whatsapp_business_account') {
+        return res.status(200).send('Not configured');
+      }
       res.type('text/xml');
       return res.send('<Response></Response>');
     }
 
-    // Save user's message
+    // 2. Detect Provider Payload Type
+    const isMeta = req.body && req.body.object === 'whatsapp_business_account';
+    let From = '';
+    let Body = '';
+
+    if (isMeta) {
+      const entry = req.body.entry?.[0];
+      const change = entry?.changes?.[0]?.value;
+      const messageObj = change?.messages?.[0];
+      
+      // If it's a status callback or read receipt from Meta (no message content), return 200 OK
+      if (!messageObj) {
+        return res.status(200).send('Event received');
+      }
+
+      // We only support text messages
+      if (messageObj.type !== 'text' || !messageObj.text?.body) {
+        console.log(`Ignored non-text message type: ${messageObj.type}`);
+        return res.status(200).send('Unsupported message type');
+      }
+
+      From = 'whatsapp:+' + messageObj.from; // format as whatsapp:+919965576297
+      Body = messageObj.text.body;
+    } else {
+      // Fallback: Twilio Form Data
+      From = req.body.From;
+      Body = req.body.Body;
+
+      if (!From || !Body) {
+        console.warn('Twilio webhook called without From or Body');
+        return res.status(400).send('Missing From or Body parameters');
+      }
+    }
+
+    // 3. Save user's message
     await WhatsappChat.create({
       phoneNumber: From,
       sender: 'User',
       message: Body
     });
 
-    // Retrieve last 15 messages for context history
+    // 4. Retrieve last 15 messages for context history
     const history = await WhatsappChat.find({ phoneNumber: From })
       .sort({ timestamp: -1 })
       .limit(15);
     
-    // Sort chronological (oldest to newest)
     history.reverse();
 
     // Map history to Gemini API format
@@ -244,7 +320,7 @@ router.post('/webhook', urlencodedParser, async (req, res) => {
       parts: [{ text: chat.message }]
     }));
 
-    // Setup Gemini API client
+    // 5. Setup Gemini API client & Prompt Context
     const genAI = new GoogleGenerativeAI(settings.geminiApiKey);
     const systemInstruction = `You are an automated, helpful AI customer support representative for Advent CRM.
 Below is the compressed, token-optimized context database of our business. You must read it, interpret the abbreviations, and use it to answer the user's questions in a friendly, concise, and helpful manner. Do NOT share the compressed text directly, but reply using complete, polite natural language. Keep messages short and conversational for WhatsApp (1-4 sentences).
@@ -255,7 +331,7 @@ ${settings.context}
 Answer the user based ONLY on the context above. If you do not know the answer, politely ask them to leave their email or phone number and tell them that a support executive will contact them.`;
 
     const model = genAI.getGenerativeModel({
-      model: settings.geminiModel || 'gemini-1.5-flash',
+      model: settings.geminiModel || 'gemini-3.1-flash-lite',
       systemInstruction: systemInstruction
     });
 
@@ -263,28 +339,73 @@ Answer the user based ONLY on the context above. If you do not know the answer, 
     const result = await model.generateContent({ contents });
     const replyText = result.response.text().trim();
 
-    // Send reply via Twilio WhatsApp API
-    const twilioClient = twilio(settings.twilioAccountSid, settings.twilioAuthToken);
-    await twilioClient.messages.create({
-      body: replyText,
-      from: settings.twilioPhoneNumber,
-      to: From
-    });
+    // 6. Send reply via active provider
+    if (isMeta) {
+      if (!settings.metaPhoneNumberId || !settings.metaAccessToken) {
+        console.warn('Meta credentials are not fully configured');
+        return res.status(200).send('Credentials missing');
+      }
 
-    // Log the AI's reply to database
+      const metaUrl = `https://graph.facebook.com/v20.0/${settings.metaPhoneNumberId}/messages`;
+      const cleanToPhone = From.replace('whatsapp:+', ''); // Meta expects plain phone number e.g. 919965576297
+      
+      const metaResponse = await fetch(metaUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${settings.metaAccessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: cleanToPhone,
+          type: 'text',
+          text: { body: replyText }
+        })
+      });
+
+      if (!metaResponse.ok) {
+        const errData = await metaResponse.json();
+        throw new Error(`Meta API send failed: ${JSON.stringify(errData)}`);
+      }
+    } else {
+      // Send via Twilio
+      if (!settings.twilioAccountSid || !settings.twilioAuthToken || !settings.twilioPhoneNumber) {
+        console.warn('Twilio credentials are not fully configured');
+        res.type('text/xml');
+        return res.send('<Response></Response>');
+      }
+
+      const twilioClient = twilio(settings.twilioAccountSid, settings.twilioAuthToken);
+      await twilioClient.messages.create({
+        body: replyText,
+        from: settings.twilioPhoneNumber,
+        to: From
+      });
+    }
+
+    // 7. Log the AI's reply to database
     await WhatsappChat.create({
       phoneNumber: From,
       sender: 'AI',
       message: replyText
     });
 
-    // Respond back to Twilio (empty response, since we sent message asynchronously)
-    res.type('text/xml');
-    res.send('<Response></Response>');
+    // 8. Respond to the HTTP client (Twilio expects XML, Meta expects JSON/status 200)
+    if (isMeta) {
+      res.status(200).json({ success: true });
+    } else {
+      res.type('text/xml');
+      res.send('<Response></Response>');
+    }
   } catch (err) {
     console.error('Error in WhatsApp webhook processing:', err);
-    res.type('text/xml');
-    res.send('<Response></Response>');
+    if (req.body && req.body.object === 'whatsapp_business_account') {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.type('text/xml');
+      res.send('<Response></Response>');
+    }
   }
 });
 

@@ -30,6 +30,12 @@ export default function WhatsappPage() {
   const [loading, setLoading] = useState(true);
   
   // Settings State
+  const [provider, setProvider] = useState<'twilio' | 'meta'>('twilio');
+  const [metaPhoneNumberId, setMetaPhoneNumberId] = useState('');
+  const [metaAccessToken, setMetaAccessToken] = useState('');
+  const [metaVerifyToken, setMetaVerifyToken] = useState('advent_verify_token');
+  const [metaBusinessAccountId, setMetaBusinessAccountId] = useState('');
+
   const [twilioAccountSid, setTwilioAccountSid] = useState('');
   const [twilioAuthToken, setTwilioAuthToken] = useState('');
   const [twilioPhoneNumber, setTwilioPhoneNumber] = useState('');
@@ -61,11 +67,17 @@ export default function WhatsappPage() {
     try {
       const res = await api.get('/whatsapp/settings');
       if (res.data) {
+        setProvider(res.data.provider || 'twilio');
+        setMetaPhoneNumberId(res.data.metaPhoneNumberId || '');
+        setMetaAccessToken(res.data.metaAccessToken || '');
+        setMetaVerifyToken(res.data.metaVerifyToken || 'advent_verify_token');
+        setMetaBusinessAccountId(res.data.metaBusinessAccountId || '');
+
         setTwilioAccountSid(res.data.twilioAccountSid || '');
         setTwilioAuthToken(res.data.twilioAuthToken || '');
         setTwilioPhoneNumber(res.data.twilioPhoneNumber || '');
         setGeminiApiKey(res.data.geminiApiKey || '');
-        setGeminiModel(res.data.geminiModel || 'gemini-1.5-flash');
+        setGeminiModel(res.data.geminiModel || 'gemini-3.1-flash-lite');
         setContext(res.data.context || '');
         setIsEnabled(res.data.isEnabled || false);
       }
@@ -121,6 +133,11 @@ export default function WhatsappPage() {
     setSavingSettings(true);
     try {
       const res = await api.post('/whatsapp/settings', {
+        provider,
+        metaPhoneNumberId,
+        metaAccessToken,
+        metaVerifyToken,
+        metaBusinessAccountId,
         twilioAccountSid,
         twilioAuthToken,
         twilioPhoneNumber,
@@ -132,6 +149,7 @@ export default function WhatsappPage() {
       toast.success('Settings saved successfully');
       if (res.data?.settings) {
         setTwilioAuthToken(res.data.settings.twilioAuthToken);
+        setMetaAccessToken(res.data.settings.metaAccessToken);
         setGeminiApiKey(res.data.settings.geminiApiKey);
       }
     } catch (err) {
@@ -322,48 +340,139 @@ export default function WhatsappPage() {
               </div>
             </div>
 
+            <div className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col gap-3">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">WhatsApp Service Provider</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setProvider('twilio')}
+                  className={`flex-1 py-3 px-4 rounded-lg font-semibold text-xs transition-all border flex items-center justify-center gap-2 ${
+                    provider === 'twilio'
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                      : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Settings size={14} />
+                  Twilio WhatsApp API
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProvider('meta')}
+                  className={`flex-1 py-3 px-4 rounded-lg font-semibold text-xs transition-all border flex items-center justify-center gap-2 ${
+                    provider === 'meta'
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                      : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Bot size={14} />
+                  Meta Business Cloud API (Free / Direct)
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
-                  Twilio Account SID
-                </label>
-                <input
-                  type="text"
-                  value={twilioAccountSid}
-                  onChange={(e) => setTwilioAccountSid(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
-                  placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                />
-              </div>
+              {provider === 'twilio' ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                      Twilio Account SID
+                    </label>
+                    <input
+                      type="text"
+                      value={twilioAccountSid}
+                      onChange={(e) => setTwilioAccountSid(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
+                      placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
-                  Twilio Auth Token
-                </label>
-                <input
-                  type="password"
-                  value={twilioAuthToken}
-                  onChange={(e) => setTwilioAuthToken(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
-                  placeholder="Obscured"
-                />
-              </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                      Twilio Auth Token
+                    </label>
+                    <input
+                      type="password"
+                      value={twilioAuthToken}
+                      onChange={(e) => setTwilioAuthToken(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
+                      placeholder="Obscured"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
-                  Twilio WhatsApp Phone Number
-                </label>
-                <input
-                  type="text"
-                  value={twilioPhoneNumber}
-                  onChange={(e) => setTwilioPhoneNumber(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
-                  placeholder="whatsapp:+14155238886"
-                />
-                <span className="text-[10px] text-gray-400 mt-1 block">Must start with 'whatsapp:' prefix</span>
-              </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                      Twilio WhatsApp Phone Number
+                    </label>
+                    <input
+                      type="text"
+                      value={twilioPhoneNumber}
+                      onChange={(e) => setTwilioPhoneNumber(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
+                      placeholder="whatsapp:+14155238886"
+                    />
+                    <span className="text-[10px] text-gray-400 mt-1 block">Must start with 'whatsapp:' prefix</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                      Meta Phone Number ID
+                    </label>
+                    <input
+                      type="text"
+                      value={metaPhoneNumberId}
+                      onChange={(e) => setMetaPhoneNumberId(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
+                      placeholder="107849xxxxxxxxxx"
+                    />
+                    <span className="text-[10px] text-gray-400 mt-1 block">Found in Meta App Settings ➔ API Setup</span>
+                  </div>
 
-              <div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                      Meta Verify Token
+                    </label>
+                    <input
+                      type="text"
+                      value={metaVerifyToken}
+                      onChange={(e) => setMetaVerifyToken(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
+                      placeholder="advent_verify_token"
+                    />
+                    <span className="text-[10px] text-gray-400 mt-1 block">Custom secret token to paste in Meta Webhook config</span>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                      Meta System User Access Token
+                    </label>
+                    <input
+                      type="password"
+                      value={metaAccessToken}
+                      onChange={(e) => setMetaAccessToken(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
+                      placeholder="Obscured permanent token"
+                    />
+                    <span className="text-[10px] text-gray-400 mt-1 block">Permanent System User token generated in Meta Business Suite</span>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                      Meta Business Account ID (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={metaBusinessAccountId}
+                      onChange={(e) => setMetaBusinessAccountId(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
+                      placeholder="Optional Account ID"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
                   Gemini API Key
                 </label>

@@ -1,6 +1,27 @@
 const mongoose = require('mongoose');
 
 const whatsappSettingSchema = new mongoose.Schema({
+  provider: {
+    type: String,
+    enum: ['twilio', 'meta'],
+    default: 'twilio'
+  },
+  metaPhoneNumberId: {
+    type: String,
+    default: ''
+  },
+  metaAccessToken: {
+    type: String,
+    default: ''
+  },
+  metaVerifyToken: {
+    type: String,
+    default: 'advent_verify_token'
+  },
+  metaBusinessAccountId: {
+    type: String,
+    default: ''
+  },
   twilioAccountSid: {
     type: String,
     default: ''
