@@ -16,18 +16,13 @@ import AnalyticsModal from '@/components/AnalyticsModal';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 
-const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Completed', 'Closed'];
+const LABEL_OPTIONS = ['Open', 'Call Back', 'Follow Up', 'Review', 'Closed'];
 
 const LABEL_CLASSES: Record<string, string> = {
   'Open': 'badge badge-open',
   'Call Back': 'badge badge-call-back',
-  'Interested': 'badge badge-interested',
-  'Not Interested': 'badge badge-not-interested',
   'Follow Up': 'badge badge-follow-up',
-  'Hot Lead': 'badge badge-hot-call',
-  'Cold Lead': 'badge badge-cold-call',
   'Review': 'badge badge-review',
-  'Completed': 'badge badge-completed',
   'Closed': 'badge badge-closed',
 };
 
@@ -177,12 +172,33 @@ export function EventDrawer({ record, defaultTab = 'details', onClose, onRefresh
     const message = encodeURIComponent(`Hi ${record.contactPerson}, this is from Advent Systems regarding our discussion...`);
     const waUrl = `https://wa.me/${cleanPhone}?text=${message}`;
 
-    api.post(`/events/records/${record._id}/whatsapp-log`).then(() => {
-      fetchActivities();
-      onRefresh();
-    }).catch(() => { });
-
-    window.open(waUrl, '_blank');
+    try {
+      const response = await api.post('/whatsapp/send-template', {
+        phoneNumber: cleanPhone,
+        recipientName: record.contactPerson
+      });
+      
+      if (response.data && response.data.success) {
+        toast.success('WhatsApp template sent automatically via Meta Cloud API!');
+        await api.post(`/events/records/${record._id}/whatsapp-log`);
+        fetchActivities();
+        onRefresh();
+      } else {
+        // Fallback to manual wa.me link
+        api.post(`/events/records/${record._id}/whatsapp-log`).then(() => {
+          fetchActivities();
+          onRefresh();
+        }).catch(() => {});
+        window.open(waUrl, '_blank');
+      }
+    } catch (err) {
+      // Fallback on request failure
+      api.post(`/events/records/${record._id}/whatsapp-log`).then(() => {
+        fetchActivities();
+        onRefresh();
+      }).catch(() => {});
+      window.open(waUrl, '_blank');
+    }
   };
 
   const handleEmail = async () => {
@@ -1152,7 +1168,7 @@ function RowMenu({ record, onRefresh, users }: { record: EventRecord; onRefresh:
           {submenu === 'labels' && (
             <div style={{ padding: 10 }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>SELECT LABELS</p>
-              {LABEL_OPTIONS.filter(lbl => isAdmin || (lbl !== 'Completed' && lbl !== 'Closed')).map(lbl => (
+              {LABEL_OPTIONS.filter(lbl => isAdmin || lbl !== 'Closed').map(lbl => (
                 <label key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer', fontSize: 13 }}>
                   <input type="radio" checked={selectedLabels.includes(lbl)}
                     onChange={() => setSelectedLabels([lbl])} />
@@ -1599,7 +1615,7 @@ function EventPageContent({ id }: { id: string }) {
                 { id: 'followup', label: 'Follow Up' },
                 { id: 'dateset', label: 'Date Set' },
                 { id: 'installation', label: 'Installation' },
-                { id: 'completed', label: 'Completed' }
+                { id: 'completed', label: 'Closed' }
               ].map(f => (
                 <button
                   key={f.id}

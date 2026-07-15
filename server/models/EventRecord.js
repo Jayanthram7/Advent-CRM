@@ -61,7 +61,7 @@ const eventRecordSchema = new mongoose.Schema({
   },
   labels: [{
     type: String,
-    enum: ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Completed', 'Closed']
+    enum: ['Open', 'Call Back', 'Follow Up', 'Review', 'Closed']
   }],
   status: {
     type: String,
@@ -113,10 +113,10 @@ eventRecordSchema.pre('save', function (next) {
   }
 
   // 2. Sync status and labels
-  if (this.labels[0] === 'Completed' || this.labels[0] === 'Closed') {
-    this.status = this.labels[0] === 'Completed' ? 'Converted' : 'Closed';
-    this.isConverted = this.labels[0] === 'Completed';
-    if (this.isConverted && !this.convertedAt) {
+  if (this.labels[0] === 'Closed') {
+    this.status = 'Closed';
+    this.isConverted = true;
+    if (!this.convertedAt) {
       this.convertedAt = new Date();
     }
   } else {
@@ -147,24 +147,20 @@ eventRecordSchema.pre('findOneAndUpdate', function (next) {
     }
     update.labels = labels;
 
-    if (labels[0] === 'Completed' || labels[0] === 'Closed') {
-      update.status = labels[0] === 'Completed' ? 'Converted' : 'Closed';
-      update.isConverted = labels[0] === 'Completed';
-      if (update.isConverted) {
-        update.convertedAt = new Date();
-      }
+    if (labels[0] === 'Closed') {
+      update.status = 'Closed';
+      update.isConverted = true;
+      update.convertedAt = new Date();
     } else {
       update.status = 'Open';
       update.isConverted = false;
       update.convertedAt = null;
     }
   } else if (status !== undefined) {
-    if (status === 'Converted' || status === 'Closed') {
-      update.labels = ['Completed'];
-      update.isConverted = status === 'Converted';
-      if (update.isConverted) {
-        update.convertedAt = new Date();
-      }
+    if (status === 'Closed') {
+      update.labels = ['Closed'];
+      update.isConverted = true;
+      update.convertedAt = new Date();
     } else {
       update.labels = ['Open'];
       update.isConverted = false;

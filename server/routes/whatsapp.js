@@ -58,6 +58,8 @@ router.post('/settings', authMiddleware, roleMiddleware('Admin'), async (req, re
       metaAccessToken,
       metaVerifyToken,
       metaBusinessAccountId,
+      metaTemplateName,
+      metaTemplateLanguage,
       twilioAccountSid,
       twilioAuthToken,
       twilioPhoneNumber,
@@ -81,6 +83,8 @@ router.post('/settings', authMiddleware, roleMiddleware('Admin'), async (req, re
     
     settings.metaVerifyToken = metaVerifyToken !== undefined ? metaVerifyToken : settings.metaVerifyToken;
     settings.metaBusinessAccountId = metaBusinessAccountId !== undefined ? metaBusinessAccountId : settings.metaBusinessAccountId;
+    settings.metaTemplateName = metaTemplateName !== undefined ? metaTemplateName : settings.metaTemplateName;
+    settings.metaTemplateLanguage = metaTemplateLanguage !== undefined ? metaTemplateLanguage : settings.metaTemplateLanguage;
 
     settings.twilioAccountSid = twilioAccountSid !== undefined ? twilioAccountSid : settings.twilioAccountSid;
     
@@ -406,6 +410,94 @@ Answer the user based ONLY on the context above. If you do not know the answer, 
       res.type('text/xml');
       res.send('<Response></Response>');
     }
+  }
+});
+
+// POST /api/whatsapp/send-template - Admin/Auth User
+// Send initial template message
+router.post('/send-template', authMiddleware, async (req, res) => {
+  try {
+    const { phoneNumber, recipientName } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, message: 'Missing phoneNumber' });
+    }
+
+    const settings = await WhatsappSetting.findOne();
+    if (!settings || !settings.isEnabled) {
+      return res.json({ success: false, message: 'WhatsApp integration is disabled' });
+    }
+
+    if (settings.provider !== 'meta') {
+      return res.json({ success: false, message: 'Template auto-sending is only supported for Meta provider' });
+    }
+
+    if (!settings.metaPhoneNumberId || !settings.metaAccessToken || !settings.metaTemplateName) {
+      return res.json({ success: false, message: 'Meta credentials or template name not configured' });
+    }
+
+    // Clean phone number (Meta expects digits only without '+' or leading spaces)
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+
+    const metaUrl = `https://graph.facebook.com/v20.0/${settings.metaPhoneNumberId}/messages`;
+    
+    // Construct Meta Template Payload
+    const bodyParams = [];
+    if (recipientName) {
+      bodyParams.push({
+        type: 'text',
+        text: recipientName
+      });
+    }
+
+    const templatePayload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: cleanPhone,
+      type: 'template',
+      template: {
+        name: settings.metaTemplateName,
+        language: {
+          code: settings.metaTemplateLanguage || 'en'
+        }
+      }
+    };
+
+    if (bodyParams.length > 0) {
+      templatePayload.template.components = [
+        {
+          type: 'body',
+          parameters: bodyParams
+        }
+      ];
+    }
+
+    const metaResponse = await fetch(metaUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${settings.metaAccessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(templatePayload)
+    });
+
+    const data = await metaResponse.json();
+
+    if (!metaResponse.ok) {
+      console.error('Meta API template send failed:', data);
+      return res.json({ success: false, message: 'Meta API template send failed', error: data });
+    }
+
+    // Log the sent template to our WhatsappChat database history
+    await WhatsappChat.create({
+      phoneNumber: 'whatsapp:+' + cleanPhone,
+      sender: 'AI',
+      message: `[Template outreach initiated: ${settings.metaTemplateName}]`
+    });
+
+    res.json({ success: true, provider: 'meta', messageId: data.messages?.[0]?.id });
+  } catch (err) {
+    console.error('Error sending WhatsApp template:', err);
+    res.status(500).json({ success: false, message: 'Internal server error sending template' });
   }
 });
 

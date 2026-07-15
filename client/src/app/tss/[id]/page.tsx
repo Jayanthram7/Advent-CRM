@@ -11,17 +11,12 @@ import { useAuth } from '@/context/AuthContext';
 import AnalyticsModalComponent from '@/components/AnalyticsModal';
 import { useSearchParams } from 'next/navigation';
 
-const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Completed', 'Closed'];
+const LABEL_OPTIONS = ['Open', 'Call Back', 'Follow Up', 'Review', 'Closed'];
 const LABEL_CLASSES: Record<string, string> = {
   'Open': 'badge badge-open',
   'Call Back': 'badge badge-call-back',
-  'Interested': 'badge badge-interested',
-  'Not Interested': 'badge badge-not-interested',
   'Follow Up': 'badge badge-follow-up',
-  'Hot Lead': 'badge badge-hot-lead',
-  'Cold Lead': 'badge badge-cold-lead',
   'Review': 'badge badge-review',
-  'Completed': 'badge badge-completed',
   'Closed': 'badge badge-closed',
 };
 
@@ -182,7 +177,7 @@ function RowMenu({ record, onRefresh, users }: { record: TssRecord; onRefresh: (
           {submenu === 'labels' && (
             <div style={{ padding: 10 }} onClick={e => e.stopPropagation()}>
               <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>SELECT LABEL</p>
-              {LABEL_OPTIONS.filter(lbl => user?.role === 'Admin' || (lbl !== 'Completed' && lbl !== 'Closed')).map(lbl => (
+              {LABEL_OPTIONS.filter(lbl => user?.role === 'Admin' || lbl !== 'Closed').map(lbl => (
                 <label key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer', fontSize: 13 }}>
                   <input type="radio" checked={selectedLabels.length === 0 ? lbl === 'Open' : selectedLabels[0] === lbl}
                     onChange={() => setSelectedLabels([lbl])} />
@@ -268,7 +263,7 @@ export function RecordDrawer({ record, defaultTab = 'details', onClose, onRefres
     return emailKey ? String(rec.data[emailKey]) : null;
   };
 
-  const handleWhatsApp = () => {
+  const handleWhatsApp = async () => {
     if (!record.mobileNumber) {
       toast.error('No mobile number available');
       return;
@@ -276,7 +271,23 @@ export function RecordDrawer({ record, defaultTab = 'details', onClose, onRefres
     const cleanPhone = record.mobileNumber.replace(/\D/g, '');
     const message = encodeURIComponent(`Hi ${record.customerName || ''}, this is from Advent Systems regarding your Tally support...`);
     const waUrl = `https://wa.me/${cleanPhone}?text=${message}`;
-    window.open(waUrl, '_blank');
+
+    try {
+      const response = await api.post('/whatsapp/send-template', {
+        phoneNumber: cleanPhone,
+        recipientName: record.customerName || ''
+      });
+      
+      if (response.data && response.data.success) {
+        toast.success('WhatsApp template sent automatically via Meta Cloud API!');
+      } else {
+        // Fallback to manual wa.me link
+        window.open(waUrl, '_blank');
+      }
+    } catch (err) {
+      // Fallback on request failure
+      window.open(waUrl, '_blank');
+    }
   };
 
   const handleEmail = () => {

@@ -168,8 +168,8 @@ router.get('/records/today', async (req, res) => {
 router.put('/records/:id/labels', async (req, res) => {
   try {
     const { labels, status } = req.body;
-    if ((status === 'Closed' || (labels && Array.isArray(labels) && (labels.includes('Completed') || labels.includes('Closed')))) && req.user.role !== 'Admin') {
-      return res.status(403).json({ message: 'Only Admins can mark records as Completed/Closed' });
+    if ((status === 'Closed' || (labels && Array.isArray(labels) && labels.includes('Closed'))) && req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'Only Admins can mark records as Closed' });
     }
     const record = await TssRecord.findByIdAndUpdate(
       req.params.id, 

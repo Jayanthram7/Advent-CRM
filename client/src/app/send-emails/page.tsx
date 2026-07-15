@@ -124,7 +124,7 @@ export default function SendEmailsPage() {
   const [tssStartDate, setTssStartDate] = useState('');
   const [tssEndDate, setTssEndDate] = useState('');
 
-  const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Completed', 'Closed'];
+  const LABEL_OPTIONS = ['Open', 'Call Back', 'Follow Up', 'Review', 'Closed'];
 
   // State for templates
   const [templates, setTemplates] = useState<Template[]>([]);

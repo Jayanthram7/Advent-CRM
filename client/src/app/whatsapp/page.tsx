@@ -35,6 +35,8 @@ export default function WhatsappPage() {
   const [metaAccessToken, setMetaAccessToken] = useState('');
   const [metaVerifyToken, setMetaVerifyToken] = useState('advent_verify_token');
   const [metaBusinessAccountId, setMetaBusinessAccountId] = useState('');
+  const [metaTemplateName, setMetaTemplateName] = useState('');
+  const [metaTemplateLanguage, setMetaTemplateLanguage] = useState('en');
 
   const [twilioAccountSid, setTwilioAccountSid] = useState('');
   const [twilioAuthToken, setTwilioAuthToken] = useState('');
@@ -72,6 +74,8 @@ export default function WhatsappPage() {
         setMetaAccessToken(res.data.metaAccessToken || '');
         setMetaVerifyToken(res.data.metaVerifyToken || 'advent_verify_token');
         setMetaBusinessAccountId(res.data.metaBusinessAccountId || '');
+        setMetaTemplateName(res.data.metaTemplateName || '');
+        setMetaTemplateLanguage(res.data.metaTemplateLanguage || 'en');
 
         setTwilioAccountSid(res.data.twilioAccountSid || '');
         setTwilioAuthToken(res.data.twilioAuthToken || '');
@@ -138,6 +142,8 @@ export default function WhatsappPage() {
         metaAccessToken,
         metaVerifyToken,
         metaBusinessAccountId,
+        metaTemplateName,
+        metaTemplateLanguage,
         twilioAccountSid,
         twilioAuthToken,
         twilioPhoneNumber,
@@ -468,6 +474,34 @@ export default function WhatsappPage() {
                       className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
                       placeholder="Optional Account ID"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                      Meta Template Name (For Outbound Initiations)
+                    </label>
+                    <input
+                      type="text"
+                      value={metaTemplateName}
+                      onChange={(e) => setMetaTemplateName(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
+                      placeholder="e.g. welcome_message"
+                    />
+                    <span className="text-[10px] text-gray-400 mt-1 block">Approved Meta template codename to send automatically on WhatsApp button click</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                      Meta Template Language
+                    </label>
+                    <input
+                      type="text"
+                      value={metaTemplateLanguage}
+                      onChange={(e) => setMetaTemplateLanguage(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm"
+                      placeholder="en"
+                    />
+                    <span className="text-[10px] text-gray-400 mt-1 block">Language code (e.g. en, es, hi)</span>
                   </div>
                 </>
               )}

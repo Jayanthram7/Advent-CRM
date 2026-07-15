@@ -31,7 +31,7 @@ tssRecordSchema.pre('save', function (next) {
   }
 
   // 2. Sync status and labels
-  if (this.labels[0] === 'Completed' || this.labels[0] === 'Closed') {
+  if (this.labels[0] === 'Closed') {
     this.status = 'Closed';
   } else {
     this.status = 'Open';
@@ -59,14 +59,14 @@ tssRecordSchema.pre('findOneAndUpdate', function (next) {
     }
     update.labels = labels;
 
-    if (labels[0] === 'Completed' || labels[0] === 'Closed') {
+    if (labels[0] === 'Closed') {
       update.status = 'Closed';
     } else {
       update.status = 'Open';
     }
   } else if (status !== undefined) {
     if (status === 'Closed') {
-      update.labels = ['Completed'];
+      update.labels = ['Closed'];
     } else {
       update.labels = ['Open'];
     }

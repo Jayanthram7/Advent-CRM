@@ -16,19 +16,14 @@ import AnalyticsModal from '@/components/AnalyticsModal';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 
-const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Completed', 'Closed'];
+const LABEL_OPTIONS = ['Open', 'Call Back', 'Follow Up', 'Review', 'Closed'];
 const SOURCE_OPTIONS = ['Website', 'Cold Call', 'Referral', 'Social Media', 'Email Campaign', 'Walk-in', 'Other'];
 
 const LABEL_CLASSES: Record<string, string> = {
   'Open': 'badge badge-open',
   'Call Back': 'badge badge-call-back',
-  'Interested': 'badge badge-interested',
-  'Not Interested': 'badge badge-not-interested',
   'Follow Up': 'badge badge-follow-up',
-  'Hot Lead': 'badge badge-hot-lead',
-  'Cold Lead': 'badge badge-cold-lead',
   'Review': 'badge badge-review',
-  'Completed': 'badge badge-completed',
   'Closed': 'badge badge-closed',
 };
 
@@ -172,13 +167,33 @@ export function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }:
     const message = encodeURIComponent(`Hi ${lead.firstName}, this is from Advent Systems regarding your inquiry...`);
     const waUrl = `https://wa.me/${cleanPhone}?text=${message}`;
     
-    // Log activity in background
-    api.post(`/leads/${lead._id}/whatsapp-log`).then(() => {
-      fetchActivities();
-      onRefresh();
-    }).catch(() => {});
-
-    window.open(waUrl, '_blank');
+    try {
+      const response = await api.post('/whatsapp/send-template', {
+        phoneNumber: cleanPhone,
+        recipientName: lead.firstName
+      });
+      
+      if (response.data && response.data.success) {
+        toast.success('WhatsApp template sent automatically via Meta Cloud API!');
+        await api.post(`/leads/${lead._id}/whatsapp-log`);
+        fetchActivities();
+        onRefresh();
+      } else {
+        // Fallback to manual wa.me link
+        api.post(`/leads/${lead._id}/whatsapp-log`).then(() => {
+          fetchActivities();
+          onRefresh();
+        }).catch(() => {});
+        window.open(waUrl, '_blank');
+      }
+    } catch (err) {
+      // Fallback on request failure
+      api.post(`/leads/${lead._id}/whatsapp-log`).then(() => {
+        fetchActivities();
+        onRefresh();
+      }).catch(() => {});
+      window.open(waUrl, '_blank');
+    }
   };
 
   const handleEmail = async () => {
@@ -1210,7 +1225,7 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
           {submenu === 'labels' && (
             <div style={{ padding: 10 }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>SELECT LABELS</p>
-              {LABEL_OPTIONS.filter(lbl => isAdmin || (lbl !== 'Completed' && lbl !== 'Closed')).map(lbl => (
+              {LABEL_OPTIONS.filter(lbl => isAdmin || lbl !== 'Closed').map(lbl => (
                 <label key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer', fontSize: 13 }}>
                   <input type="radio" checked={selectedLabels.includes(lbl)}
                     onChange={() => setSelectedLabels([lbl])} />

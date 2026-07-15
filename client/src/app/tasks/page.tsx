@@ -57,18 +57,13 @@ const SOURCE_BADGES: Record<string, { bg: string; color: string; label: string }
 const LABEL_CLASSES: Record<string, string> = {
   'Open': 'badge badge-open',
   'Call Back': 'badge badge-call-back',
-  'Interested': 'badge badge-interested',
-  'Not Interested': 'badge badge-not-interested',
   'Follow Up': 'badge badge-follow-up',
-  'Hot Lead': 'badge badge-hot-call',
-  'Cold Lead': 'badge badge-cold-call',
   'Review': 'badge badge-review',
   'Converted': 'badge badge-converted',
-  'Completed': 'badge badge-completed',
   'Closed': 'badge badge-closed',
 };
 
-const LABEL_OPTIONS = ['Open', 'Call Back', 'Interested', 'Not Interested', 'Follow Up', 'Hot Lead', 'Cold Lead', 'Review', 'Completed', 'Closed'];
+const LABEL_OPTIONS = ['Open', 'Call Back', 'Follow Up', 'Review', 'Closed'];
 
 // ─── Task Row Menu ─────────────────────────────────────────────────────────────
 function TaskRowMenu({ record, onRefresh, users }: { record: TaskRecord; onRefresh: () => void; users: any[] }) {
@@ -250,7 +245,7 @@ function TaskRowMenu({ record, onRefresh, users }: { record: TaskRecord; onRefre
           {submenu === 'labels' && (
             <div style={{ padding: 10 }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>SELECT LABEL</p>
-              {LABEL_OPTIONS.filter(lbl => user?.role === 'Admin' || (lbl !== 'Completed' && lbl !== 'Closed')).map(lbl => (
+              {LABEL_OPTIONS.filter(lbl => user?.role === 'Admin' || lbl !== 'Closed').map(lbl => (
                 <label key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer', fontSize: 13 }}>
                   <input type="radio" checked={selectedLabels.length === 0 ? lbl === 'Open' : selectedLabels[0] === lbl}
                     onChange={() => setSelectedLabels([lbl])} />

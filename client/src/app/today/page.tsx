@@ -10,12 +10,7 @@ import toast from 'react-hot-toast';
 const LABEL_CLASSES: Record<string, string> = {
   'Open': 'badge badge-open',
   'Call Back': 'badge badge-callback',
-  'Interested': 'badge badge-interested',
-  'Not Interested': 'badge badge-not-interested',
   'Follow Up': 'badge badge-followup',
-  'Hot Lead': 'badge badge-hot',
-  'Cold Lead': 'badge badge-cold',
-  'Completed': 'badge badge-completed',
   'Closed': 'badge badge-closed',
 };
 

@@ -22,6 +22,14 @@ const whatsappSettingSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  metaTemplateName: {
+    type: String,
+    default: ''
+  },
+  metaTemplateLanguage: {
+    type: String,
+    default: 'en'
+  },
   twilioAccountSid: {
     type: String,
     default: ''

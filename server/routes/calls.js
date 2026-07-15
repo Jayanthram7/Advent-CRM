@@ -389,8 +389,8 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/labels', async (req, res) => {
   try {
     const { labels } = req.body;
-    if (labels && Array.isArray(labels) && (labels.includes('Completed') || labels.includes('Closed')) && req.user.role !== 'Admin') {
-      return res.status(403).json({ message: 'Only Admins can mark records as Completed/Closed' });
+    if (labels && Array.isArray(labels) && labels.includes('Closed') && req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'Only Admins can mark records as Closed' });
     }
     const call = await Call.findByIdAndUpdate(
       req.params.id,

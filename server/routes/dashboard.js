@@ -35,7 +35,7 @@ async function getModelOverview(Model, baseQuery, modelName) {
       ...baseQuery, 
       $or: [
         ...(isTss ? [] : [{ isConverted: true }]),
-        { labels: { $in: ['Completed', 'Closed'] } }
+        { labels: 'Closed' }
       ]
     })
   ]);
