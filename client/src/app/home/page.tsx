@@ -1000,9 +1000,6 @@ export default function HomePage() {
                 </div>
 
                 <div style={{ display: 'flex', gap: 10, zIndex: 10 }}>
-                  <button style={{ flex: 1, padding: '10px', borderRadius: 30, background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                    Pause
-                  </button>
                   <button style={{ flex: 1, padding: '10px', borderRadius: 30, background: '#ffffff', border: 'none', color: '#1a1f36', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                     View Log
                   </button>
