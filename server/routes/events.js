@@ -13,7 +13,12 @@ router.use(authMiddleware);
 // GET /api/events/datasets - Get all events/datasets
 router.get('/datasets', async (req, res) => {
   try {
-    const datasets = await EventDataset.find().sort({ createdAt: -1 });
+    let query = {};
+    if (req.user.role === 'Agent') {
+      const assignedDatasetIds = await EventRecord.distinct('datasetId', { assignedTo: req.user._id });
+      query._id = { $in: assignedDatasetIds };
+    }
+    const datasets = await EventDataset.find(query).sort({ createdAt: -1 });
     res.json(datasets);
   } catch (err) {
     console.error('Get datasets error:', err);
@@ -24,6 +29,12 @@ router.get('/datasets', async (req, res) => {
 // GET /api/events/datasets/:id - Get a single event dataset info
 router.get('/datasets/:id', async (req, res) => {
   try {
+    if (req.user.role === 'Agent') {
+      const hasAssigned = await EventRecord.exists({ datasetId: req.params.id, assignedTo: req.user._id });
+      if (!hasAssigned) {
+        return res.status(403).json({ message: 'Access denied: No records assigned to you in this event' });
+      }
+    }
     const dataset = await EventDataset.findById(req.params.id);
     if (!dataset) return res.status(404).json({ message: 'Event dataset not found' });
     res.json(dataset);
@@ -450,7 +461,102 @@ router.delete('/records/:id', async (req, res) => {
   }
 });
 
+// DELETE /api/events/records/bulk - bulk delete records (Admin only)
+router.delete('/records/bulk', async (req, res) => {
+  if (req.user.role !== 'Admin') {
+    return res.status(403).json({ message: 'Only admins can bulk delete records' });
+  }
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'ids array is required' });
+    }
+    await Note.deleteMany({ eventRecord: { $in: ids } });
+    await Activity.deleteMany({ eventRecord: { $in: ids } });
+    const result = await EventRecord.deleteMany({ _id: { $in: ids } });
+    res.json({ message: `${result.deletedCount} records deleted successfully` });
+  } catch (err) {
+    console.error('Bulk delete error:', err);
+    res.status(500).json({ message: 'Server error during bulk delete' });
+  }
+});
+
+// POST /api/events/records/bulk/labels - bulk update labels
+router.post('/records/bulk/labels', async (req, res) => {
+  try {
+    const { ids, labels } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'ids array is required' });
+    }
+    if (labels && labels.includes('Closed') && req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'Only Admins can mark records as Closed' });
+    }
+    await EventRecord.updateMany({ _id: { $in: ids } }, { labels });
+    const activities = ids.map(id => ({
+      eventRecord: id,
+      type: 'Label',
+      content: `Labels updated to: ${labels.join(', ')} by ${req.user.name} (bulk action)`,
+      performedBy: req.user._id
+    }));
+    await Activity.insertMany(activities);
+    res.json({ message: `Labels updated for ${ids.length} records` });
+  } catch (err) {
+    console.error('Bulk label error:', err);
+    res.status(500).json({ message: 'Server error during bulk label update' });
+  }
+});
+
+// PUT /api/events/records/bulk/assign - bulk assign records (Admin only)
+router.put('/records/bulk/assign', async (req, res) => {
+  if (req.user.role !== 'Admin') {
+    return res.status(403).json({ message: 'Only admins can bulk assign records' });
+  }
+  try {
+    const { ids, assignedTo } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'ids array is required' });
+    }
+    const User = require('../models/User');
+    const assignedUser = await User.findById(assignedTo);
+    await EventRecord.updateMany({ _id: { $in: ids } }, { assignedTo });
+    const activities = ids.map(id => ({
+      eventRecord: id,
+      type: 'Assignment',
+      content: `Record assigned to ${assignedUser ? assignedUser.name : 'Unknown User'} by ${req.user.name} (bulk action)`,
+      performedBy: req.user._id
+    }));
+    await Activity.insertMany(activities);
+    res.json({ message: `${ids.length} records assigned` });
+  } catch (err) {
+    console.error('Bulk assign error:', err);
+    res.status(500).json({ message: 'Server error during bulk assign' });
+  }
+});
+
+// POST /api/events/records/bulk/convert - bulk mark as converted (Admin only)
+router.post('/records/bulk/convert', roleMiddleware('Admin'), async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'ids array is required' });
+    }
+    await EventRecord.updateMany({ _id: { $in: ids } }, { isConverted: true, convertedAt: new Date(), status: 'Converted' });
+    const activities = ids.map(id => ({
+      eventRecord: id,
+      type: 'Conversion',
+      content: `Record marked as Converted by ${req.user.name} (bulk action)`,
+      performedBy: req.user._id
+    }));
+    await Activity.insertMany(activities);
+    res.json({ message: `${ids.length} records marked as converted` });
+  } catch (err) {
+    console.error('Bulk convert error:', err);
+    res.status(500).json({ message: 'Server error during bulk convert' });
+  }
+});
+
 // POST /api/events/records/:id/labels - update labels
+
 router.post('/records/:id/labels', async (req, res) => {
   try {
     const { labels } = req.body;

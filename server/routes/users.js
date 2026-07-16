@@ -13,6 +13,7 @@ const EventRecord = require('../models/EventRecord');
 const EventDataset = require('../models/EventDataset');
 const TssRecord = require('../models/TssRecord');
 const TssDataset = require('../models/TssDataset');
+const Task = require('../models/Task');
 
 router.use(authMiddleware);
 
@@ -59,11 +60,12 @@ router.get('/tasks', async (req, res) => {
       query.assignedTo = { $ne: null };
     }
 
-    const [leads, calls, eventRecords, tssRecords] = await Promise.all([
+    const [leads, calls, eventRecords, tssRecords, tasks] = await Promise.all([
       Lead.find(query).populate('assignedTo', 'name email role').lean(),
       Call.find(query).populate('assignedTo', 'name email role').lean(),
       EventRecord.find(query).populate('datasetId', 'name').populate('assignedTo', 'name email role').lean(),
-      TssRecord.find(query).populate('datasetId', 'name').populate('assignedTo', 'name email role').lean()
+      TssRecord.find(query).populate('datasetId', 'name').populate('assignedTo', 'name email role').lean(),
+      Task.find(query).populate('assignedTo', 'name email role').lean()
     ]);
 
     const unified = [];
@@ -156,6 +158,28 @@ router.get('/tasks', async (req, res) => {
         followUpDate: t.followUpDate,
         installationDate: t.renewalDate,
         renewalDate: t.renewalDate,
+        createdAt: t.createdAt,
+        assignedTo: t.assignedTo
+      });
+    });
+
+    // Map Custom Tasks
+    tasks.forEach(t => {
+      unified.push({
+        _id: `tasks_${t._id}`,
+        originalId: t._id,
+        source: 'tasks',
+        name: t.title || 'N/A',
+        company: 'Custom Task',
+        email: '—',
+        phone: '—',
+        reason: t.description || '—',
+        licenseNumber: '—',
+        status: t.status || 'Open',
+        labels: t.labels || [],
+        callbackDate: t.callbackDate,
+        followUpDate: t.followUpDate,
+        installationDate: t.installationDate,
         createdAt: t.createdAt,
         assignedTo: t.assignedTo
       });

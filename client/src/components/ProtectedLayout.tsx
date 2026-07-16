@@ -1,5 +1,5 @@
 'use client';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Sidebar from './Sidebar';
@@ -25,6 +25,7 @@ const SECTIONS = [
 export default function ProtectedLayout({ children, requiredRole }: ProtectedLayoutProps) {
   const { user, loading, sidebarCollapsed } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [showDock, setShowDock] = useState(true);
 
   // Dragging states
@@ -238,11 +239,19 @@ export default function ProtectedLayout({ children, requiredRole }: ProtectedLay
 
   // Load dock visibility preference and listen for Ctrl+H
   useEffect(() => {
-    const stored = localStorage.getItem('advent_crm_show_dock');
-    if (stored !== null) {
-      setShowDock(stored === 'true');
+    if (pathname === '/team-chat') {
+      setShowDock(false);
+    } else {
+      const stored = localStorage.getItem('advent_crm_show_dock');
+      if (stored !== null) {
+        setShowDock(stored === 'true');
+      } else {
+        setShowDock(true);
+      }
     }
+  }, [pathname]);
 
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check for Ctrl + H (or Cmd + H on macOS)
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'h') {
@@ -485,7 +494,7 @@ export default function ProtectedLayout({ children, requiredRole }: ProtectedLay
                             fontSize: 9, 
                             fontWeight: 700, 
                             color: 'white', 
-                            background: rec.type === 'Agent' ? '#8b5cf6' : rec.type === 'TSS' ? '#1a1f36' : rec.type === 'Lead' ? '#3b82f6' : rec.type === 'Call' ? '#f59e0b' : '#10b981',
+                            background: rec.type === 'Agent' ? '#8b5cf6' : rec.type === 'TSS' ? '#1a1f36' : rec.type === 'Lead' ? '#3b82f6' : rec.type === 'Call' ? '#f59e0b' : rec.type === 'Task' ? '#6366f1' : '#10b981',
                             padding: '2px 6px',
                             borderRadius: 4,
                             marginTop: 2

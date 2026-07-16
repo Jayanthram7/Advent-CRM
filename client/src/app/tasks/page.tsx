@@ -10,7 +10,7 @@ import {
   ChevronUp, ChevronDown, RefreshCw, X, ArrowUpRight,
   Building2, CheckSquare, Clock, Database, Calendar,
   MoreVertical, Tag, User, CheckCircle, FileText, Trash2,
-  AlertCircle
+  AlertCircle, Plus, Edit
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -25,7 +25,7 @@ interface TaskRecord {
   originalId: string;
   datasetId?: string;
   datasetName?: string;
-  source: 'leads' | 'calls' | 'events' | 'tss';
+  source: 'leads' | 'calls' | 'events' | 'tss' | 'tasks';
   name: string;
   company: string;
   email: string;
@@ -52,6 +52,7 @@ const SOURCE_BADGES: Record<string, { bg: string; color: string; label: string }
   calls: { bg: '#dcfce7', color: '#15803d', label: 'Call' },
   events: { bg: '#f3e8ff', color: '#6b21a8', label: 'Event' },
   tss: { bg: '#ffedd5', color: '#c2410c', label: 'TSS' },
+  tasks: { bg: '#e0e7ff', color: '#4f46e5', label: 'Custom Task' }
 };
 
 const LABEL_CLASSES: Record<string, string> = {
@@ -95,6 +96,7 @@ function TaskRowMenu({ record, onRefresh, users }: { record: TaskRecord; onRefre
   const getBaseUrl = (source: string, id: string) => {
     if (source === 'tss') return `/tss/records/${id}`;
     if (source === 'events') return `/events/records/${id}`;
+    if (source === 'tasks') return `/tasks/${id}`;
     return `/${source}/${id}`;
   };
 
@@ -395,10 +397,11 @@ function TasksPageContent() {
 
   // States for detailed drawer expansion
   const [selectedRecord, setSelectedRecord] = useState<Lead | Call | EventRecord | TssRecord | null>(null);
-  const [activeDrawerSource, setActiveDrawerSource] = useState<'leads' | 'calls' | 'events' | 'tss' | null>(null);
+  const [activeDrawerSource, setActiveDrawerSource] = useState<'leads' | 'calls' | 'events' | 'tss' | 'tasks' | null>(null);
   const [drawerTab, setDrawerTab] = useState<'details' | 'notes' | 'log'>('details');
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [reviewCount, setReviewCount] = useState(0);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   useEffect(() => {
     if (isAdminOrManager) {
@@ -423,6 +426,7 @@ function TasksPageContent() {
       else if (item.source === 'calls') url = `/calls/${item.originalId}`;
       else if (item.source === 'events') url = `/events/records/${item.originalId}`;
       else if (item.source === 'tss') url = `/tss/records/${item.originalId}`;
+      else if (item.source === 'tasks') url = `/tasks/${item.originalId}`;
 
       const res = await api.get(url);
       setSelectedRecord(res.data);
@@ -586,49 +590,58 @@ function TasksPageContent() {
     <ProtectedLayout>
       <TopBar title="Assigned Tasks" onRefresh={fetchRecords}>
         {isAdminOrManager && (
-          <button
-            className={filterLabel === 'Review' ? 'btn-danger' : 'btn-secondary'}
-            onClick={() => {
-              setFilterLabel(prev => prev === 'Review' ? '' : 'Review');
-              setPage(1);
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              position: 'relative',
-              ...(filterLabel === 'Review' ? {
-                background: '#fee2e2',
-                color: '#b91c1c',
-                borderColor: '#fca5a5'
-              } : {})
-            }}
-          >
-            <AlertCircle size={14} style={filterLabel === 'Review' ? { color: '#b91c1c' } : {}} />
-            Needs Review
-            {reviewCount > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: '-6px',
-                right: '-6px',
-                background: '#ef4444',
-                color: 'white',
-                borderRadius: '50%',
-                minWidth: '18px',
-                height: '18px',
-                fontSize: '10px',
-                fontWeight: 700,
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              className="btn-primary"
+              onClick={() => setIsCreateModalOpen(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 20, padding: '8px 16px', fontSize: 13, fontWeight: 600 }}
+            >
+              <Plus size={14} /> Create Task
+            </button>
+            <button
+              className={filterLabel === 'Review' ? 'btn-danger' : 'btn-secondary'}
+              onClick={() => {
+                setFilterLabel(prev => prev === 'Review' ? '' : 'Review');
+                setPage(1);
+              }}
+              style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                padding: '0 4px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                zIndex: 10
-              }}>
-                {reviewCount}
-              </span>
-            )}
-          </button>
+                gap: 6,
+                position: 'relative',
+                ...(filterLabel === 'Review' ? {
+                  background: '#fee2e2',
+                  color: '#b91c1c',
+                  borderColor: '#fca5a5'
+                } : {})
+              }}
+            >
+              <AlertCircle size={14} style={filterLabel === 'Review' ? { color: '#b91c1c' } : {}} />
+              Needs Review
+              {reviewCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-6px',
+                  right: '-6px',
+                  background: '#ef4444',
+                  color: 'white',
+                  borderRadius: '50%',
+                  minWidth: '18px',
+                  height: '18px',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 4px',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                  zIndex: 10
+                }}>
+                  {reviewCount}
+                </span>
+              )}
+            </button>
+          </div>
         )}
       </TopBar>
 
@@ -1026,7 +1039,771 @@ function TasksPageContent() {
           }}
         />
       )}
+      {activeDrawerSource === 'tasks' && selectedRecord && (
+        <TaskDrawer
+          task={selectedRecord as any}
+          defaultTab={drawerTab}
+          onClose={() => {
+            setSelectedRecord(null);
+            setActiveDrawerSource(null);
+          }}
+          onRefresh={(updated) => {
+            fetchRecords();
+            if (updated) setSelectedRecord(updated as any);
+          }}
+          agents={agents}
+        />
+      )}
+      <CreateTaskModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onRefresh={fetchRecords}
+        agents={agents}
+      />
     </ProtectedLayout>
+  );
+}
+
+// ─── TaskDrawer Component ───────────────────────────────────────────────────
+export function TaskDrawer({
+  task,
+  defaultTab = 'details',
+  onClose,
+  onRefresh,
+  agents
+}: {
+  task: any;
+  defaultTab?: 'details' | 'notes' | 'log';
+  onClose: () => void;
+  onRefresh: (updatedTask?: any) => void;
+  agents: any[];
+}) {
+  const { user } = useAuth();
+  const isAdminOrManager = user?.role === 'Admin' || user?.role === 'Manager';
+  const [activeTab, setActiveTab] = useState<'details' | 'notes' | 'log'>(defaultTab);
+  const [showEdit, setShowEdit] = useState(false);
+  const [notes, setNotes] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [newNote, setNewNote] = useState('');
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+
+  // Form edit states (for inline details editing)
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description || '');
+  const [assignedTo, setAssignedTo] = useState(task.assignedTo?._id || '');
+  const [status, setStatus] = useState(task.status);
+  const [label, setLabel] = useState(task.labels?.[0] || 'Open');
+  const [updating, setUpdating] = useState(false);
+
+  // Quick dates editing
+  const [isUpdatingFollowUp, setIsUpdatingFollowUp] = useState(false);
+  const [newFollowUpDate, setNewFollowUpDate] = useState(task.followUpDate ? task.followUpDate.split('T')[0] : '');
+  const [isUpdatingCallback, setIsUpdatingCallback] = useState(false);
+  const [newCallbackDate, setNewCallbackDate] = useState(task.callbackDate ? task.callbackDate.split('T')[0] : '');
+  const [isUpdatingInstallation, setIsUpdatingInstallation] = useState(false);
+  const [newInstallationDate, setNewInstallationDate] = useState(task.installationDate ? task.installationDate.split('T')[0] : '');
+
+  const fetchNotes = useCallback(() => {
+    setNotesLoading(true);
+    api.get(`/tasks/${task._id}/notes`)
+      .then(r => setNotes(r.data))
+      .catch(() => {})
+      .finally(() => setNotesLoading(false));
+  }, [task._id]);
+
+  const fetchActivities = useCallback(() => {
+    setActivitiesLoading(true);
+    api.get(`/tasks/${task._id}/activities`)
+      .then(r => setActivities(r.data))
+      .catch(() => {})
+      .finally(() => setActivitiesLoading(false));
+  }, [task._id]);
+
+  useEffect(() => {
+    fetchNotes();
+    fetchActivities();
+  }, [fetchNotes, fetchActivities]);
+
+  const addNote = async () => {
+    if (!newNote.trim()) return;
+    setNotesLoading(true);
+    try {
+      await api.post(`/tasks/${task._id}/notes`, { content: newNote });
+      fetchNotes();
+      fetchActivities();
+      setNewNote('');
+      toast.success('Note added');
+      onRefresh();
+    } catch {
+      toast.error('Failed to add note');
+    } finally {
+      setNotesLoading(false);
+    }
+  };
+
+  const handleUpdateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUpdating(true);
+    try {
+      await api.put(`/tasks/${task._id}`, { assignedTo, status });
+      await api.post(`/tasks/${task._id}/labels`, { labels: [label] });
+      toast.success('Task details updated successfully');
+      const res = await api.get(`/tasks/${task._id}`);
+      onRefresh(res.data);
+      setShowEdit(false);
+      fetchActivities();
+    } catch {
+      toast.error('Failed to update task details');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const saveDate = async (type: 'callbackDate' | 'followUpDate' | 'installationDate', val: string) => {
+    try {
+      await api.post(`/tasks/${task._id}/date`, { [type]: val });
+      toast.success('Task date updated');
+      const res = await api.get(`/tasks/${task._id}`);
+      onRefresh(res.data);
+      setIsUpdatingCallback(false);
+      setIsUpdatingFollowUp(false);
+      setIsUpdatingInstallation(false);
+      fetchActivities();
+    } catch {
+      toast.error('Failed to update task date');
+    }
+  };
+
+  const InfoRow = ({ icon, label, value }: { icon: React.ReactNode; label: string; value?: string | React.ReactNode }) => (
+    value ? (
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderBottom: '1px solid #f0f2f7', textAlign: 'left' }}>
+        <div style={{ color: '#9ca3af', marginTop: 2, flexShrink: 0 }}>{icon}</div>
+        <div>
+          <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>{label}</div>
+          <div style={{ fontSize: 13.5, color: '#1a1f36', fontWeight: 500 }}>{value}</div>
+        </div>
+      </div>
+    ) : null
+  );
+
+  const getInitials = (titleStr: string) => {
+    return titleStr
+      .split(' ')
+      .slice(0, 2)
+      .map(w => w[0])
+      .join('')
+      .toUpperCase();
+  };
+
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.3)', zIndex: 150, backdropFilter: 'blur(2.8px)', animation: 'fadeIn 0.2s ease' }}
+      />
+      {/* Drawer */}
+      <div style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 480,
+        background: 'white', boxShadow: '-8px 0 40px rgba(0,0,0,0.15)',
+        zIndex: 160, display: 'flex', flexDirection: 'column',
+        animation: 'slideInRight 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+      }}>
+        {/* Drawer Header */}
+        <div style={{ padding: '24px 24px 0', borderBottom: '1px solid #f0f2f7' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 17, fontWeight: 700, color: 'white', flexShrink: 0
+              }}>
+                {getInitials(task.title)}
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1f36' }}>
+                  {task.title}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                  <span className={`badge ${task.status === 'Closed' ? 'badge-closed' : 'badge-open'}`} style={{ fontSize: 11 }}>
+                    {task.status}
+                  </span>
+                  {(task.labels || []).map((l: string) => (
+                    <span key={l} className="badge" style={{ background: '#f1f5f9', color: '#475569', fontSize: 11 }}>{l}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4, borderRadius: 6 }}>
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: -1 }}>
+            <div style={{ display: 'flex', gap: 0 }}>
+              {(['details', 'notes', 'log'] as const).map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab)} style={{
+                  padding: '10px 18px', fontSize: 13.5, fontWeight: activeTab === tab ? 600 : 400,
+                  border: 'none', background: 'none', cursor: 'pointer',
+                  color: activeTab === tab ? '#4f46e5' : '#6b7280',
+                  borderBottom: activeTab === tab ? '2px solid #4f46e5' : '2px solid transparent',
+                  transition: 'all 0.15s', textTransform: 'capitalize'
+                }}>
+                  {tab === 'notes' ? `Notes (${notes.length})` : tab === 'log' ? 'Edit Log' : 'Details'}
+                </button>
+              ))}
+            </div>
+            {isAdminOrManager && activeTab === 'details' && (
+              <button
+                onClick={() => setShowEdit(!showEdit)}
+                style={{
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: 8,
+                  padding: '6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  marginBottom: 6
+                }}
+                onMouseOver={e => e.currentTarget.style.background = '#dbeafe'}
+                onMouseOut={e => e.currentTarget.style.background = '#eff6ff'}
+              >
+                <Edit size={14} />
+                {showEdit ? 'Cancel Edit' : 'Edit Entry'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Drawer Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 24px' }}>
+          {activeTab === 'details' && (
+            <div style={{ paddingTop: 8 }}>
+              {showEdit ? (
+                <form onSubmit={handleUpdateTask} style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16, textAlign: 'left' }}>
+                  <div>
+                    <label style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Title</label>
+                    <input type="text" className="form-control" value={title} onChange={e => setTitle(e.target.value)} required />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Description</label>
+                    <textarea className="form-control" value={description} onChange={e => setDescription(e.target.value)} rows={4} />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Assigned Employee</label>
+                    <select className="form-select" value={assignedTo} onChange={e => setAssignedTo(e.target.value)}>
+                      <option value="">Select Employee</option>
+                      {agents.map(a => (
+                        <option key={a._id} value={a._id}>{a.name} ({a.role})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Status</label>
+                      <select className="form-select" value={status} onChange={e => setStatus(e.target.value)}>
+                        <option value="Open">Open</option>
+                        <option value="Closed">Closed</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Label</label>
+                      <select className="form-select" value={label} onChange={e => setLabel(e.target.value)}>
+                        <option value="Open">Open</option>
+                        <option value="Call Back">Call Back</option>
+                        <option value="Follow Up">Follow Up</option>
+                        <option value="Review">Review</option>
+                        <option value="Closed">Closed</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Callback Date</label>
+                      <input type="date" className="form-control" value={newCallbackDate} onChange={e => setNewCallbackDate(e.target.value)} />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Follow Up Date</label>
+                      <input type="date" className="form-control" value={newFollowUpDate} onChange={e => setNewFollowUpDate(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Installation Date</label>
+                    <input type="date" className="form-control" value={newInstallationDate} onChange={e => setNewInstallationDate(e.target.value)} />
+                  </div>
+
+                  <button type="submit" disabled={updating} className="btn-primary" style={{ marginTop: 8, justifyContent: 'center' }}>
+                    {updating ? 'Saving...' : 'Save Task Details'}
+                  </button>
+                </form>
+              ) : (
+                <>
+                  {/* Callback Callout */}
+                  {task.callbackDate && (
+                    <div style={{
+                      background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '1px solid #bfdbfe',
+                      borderRadius: 10, padding: '14px 16px', margin: '16px 0 8px 0',
+                      display: 'flex', flexDirection: 'column', gap: 10
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Calendar size={16} style={{ color: '#1d4ed8', flexShrink: 0 }} />
+                          <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Callback Date</div>
+                            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1a1f36', marginTop: 1 }}>
+                              {format(new Date(task.callbackDate), 'EEEE, MMMM d, yyyy')}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setIsUpdatingCallback(!isUpdatingCallback)}
+                          style={{
+                            background: '#1d4ed8', color: 'white', border: 'none',
+                            borderRadius: 6, padding: '4px 10px', fontSize: 12,
+                            fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.15s'
+                          }}
+                        >
+                          {isUpdatingCallback ? 'Cancel' : 'Update'}
+                        </button>
+                      </div>
+
+                      {isUpdatingCallback && (
+                        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                          <input
+                            type="date"
+                            value={newCallbackDate}
+                            onChange={e => setNewCallbackDate(e.target.value)}
+                            style={{ border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', fontSize: 13, outline: 'none', background: 'white', flex: 1 }}
+                          />
+                          <button
+                            onClick={() => saveDate('callbackDate', newCallbackDate)}
+                            style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            Save
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Follow Up Callout */}
+                  {task.followUpDate && (
+                    <div style={{
+                      background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', border: '1px solid #fde68a',
+                      borderRadius: 10, padding: '14px 16px', margin: '8px 0',
+                      display: 'flex', flexDirection: 'column', gap: 10
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Clock size={16} style={{ color: '#d97706', flexShrink: 0 }} />
+                          <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Follow Up Date</div>
+                            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1a1f36', marginTop: 1 }}>
+                              {format(new Date(task.followUpDate), 'EEEE, MMMM d, yyyy')}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setIsUpdatingFollowUp(!isUpdatingFollowUp)}
+                          style={{
+                            background: '#d97706', color: 'white', border: 'none',
+                            borderRadius: 6, padding: '4px 10px', fontSize: 12,
+                            fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.15s'
+                          }}
+                        >
+                          {isUpdatingFollowUp ? 'Cancel' : 'Update'}
+                        </button>
+                      </div>
+
+                      {isUpdatingFollowUp && (
+                        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                          <input
+                            type="date"
+                            value={newFollowUpDate}
+                            onChange={e => setNewFollowUpDate(e.target.value)}
+                            style={{ border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', fontSize: 13, outline: 'none', background: 'white', flex: 1 }}
+                          />
+                          <button
+                            onClick={() => saveDate('followUpDate', newFollowUpDate)}
+                            style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            Save
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Installation Date Callout */}
+                  {task.installationDate && (
+                    <div style={{
+                      background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1px solid #bbf7d0',
+                      borderRadius: 10, padding: '14px 16px', margin: '8px 0 16px 0',
+                      display: 'flex', flexDirection: 'column', gap: 10
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Calendar size={16} style={{ color: '#166534', flexShrink: 0 }} />
+                          <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Installation Date</div>
+                            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1a1f36', marginTop: 1 }}>
+                              {format(new Date(task.installationDate), 'EEEE, MMMM d, yyyy')}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setIsUpdatingInstallation(!isUpdatingInstallation)}
+                          style={{
+                            background: '#166534', color: 'white', border: 'none',
+                            borderRadius: 6, padding: '4px 10px', fontSize: 12,
+                            fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.15s'
+                          }}
+                        >
+                          {isUpdatingInstallation ? 'Cancel' : 'Update'}
+                        </button>
+                      </div>
+
+                      {isUpdatingInstallation && (
+                        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                          <input
+                            type="date"
+                            value={newInstallationDate}
+                            onChange={e => setNewInstallationDate(e.target.value)}
+                            style={{ border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', fontSize: 13, outline: 'none', background: 'white', flex: 1 }}
+                          />
+                          <button
+                            onClick={() => saveDate('installationDate', newInstallationDate)}
+                            style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            Save
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Empty State for dates */}
+                  {!task.callbackDate && !task.followUpDate && !task.installationDate && (
+                    <div style={{ padding: '20px 24px', background: '#f8fafc', border: '1px dashed #e2e8f0', borderRadius: 12, textAlign: 'center', margin: '16px 0 20px 0' }}>
+                      <Calendar size={20} style={{ color: '#94a3b8', marginBottom: 6, display: 'block', margin: '0 auto 8px' }} />
+                      <p style={{ fontSize: 13, color: '#64748b', margin: 0, fontWeight: 500 }}>No follow-up dates are set for this task.</p>
+                      {isAdminOrManager && (
+                        <button
+                          onClick={() => setShowEdit(true)}
+                          style={{ background: 'none', border: 'none', color: '#4f46e5', fontWeight: 600, fontSize: 12.5, marginTop: 6, cursor: 'pointer', outline: 'none' }}
+                        >
+                          Set dates in task settings
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Info Rows */}
+                  <div style={{ display: 'flex', flexDirection: 'column', marginTop: 10 }}>
+                    <InfoRow icon={<FileText size={16} />} label="Task Description" value={task.description || '—'} />
+                    <InfoRow icon={<User size={16} />} label="Assigned Employee" value={
+                      task.assignedTo ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                          <div style={{
+                            width: 24, height: 24, borderRadius: '50%', background: '#e0e7ff', color: '#4f46e5',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700
+                          }}>
+                            {getInitials(task.assignedTo.name)}
+                          </div>
+                          <span>{task.assignedTo.name} ({task.assignedTo.role})</span>
+                        </div>
+                      ) : 'Unassigned'
+                    } />
+                    <InfoRow icon={<Tag size={16} />} label="Label Category" value={task.labels?.[0] || 'Open'} />
+                    <InfoRow icon={<CheckCircle size={16} />} label="Task Status" value={task.status} />
+                    <InfoRow icon={<User size={16} />} label="Created By" value={task.createdBy?.name || 'System'} />
+                    <InfoRow icon={<Clock size={16} />} label="Creation Timestamp" value={task.createdAt ? format(new Date(task.createdAt), 'MMMM d, yyyy · hh:mm a') : undefined} />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'notes' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingTop: 20 }}>
+              {/* Add Note Form */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: '#f8fafc', borderRadius: 16, padding: 16, border: '1px solid #e2e8f0' }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: '50%', background: '#4f46e5', color: 'white',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0
+                }}>
+                  {getInitials(user?.name || 'Me')}
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <textarea
+                    placeholder="Write a comment or update note..."
+                    rows={2}
+                    value={newNote}
+                    onChange={e => setNewNote(e.target.value)}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      resize: 'none',
+                      fontSize: 13.5,
+                      outline: 'none',
+                      color: '#1e293b',
+                      width: '100%',
+                      padding: 0
+                    }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={addNote}
+                      disabled={notesLoading || !newNote.trim()}
+                      className="btn-primary"
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: 12.5,
+                        borderRadius: 8,
+                        minWidth: 80,
+                        opacity: !newNote.trim() ? 0.5 : 1,
+                        cursor: !newNote.trim() ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      Post Note
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes List (Social / Chat Style feed) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, position: 'relative' }}>
+                {notes.map((n, i) => (
+                  <div key={n._id} style={{ display: 'flex', gap: 12, textAlign: 'left', position: 'relative' }}>
+                    {/* Visual Connector Line between notes */}
+                    {i < notes.length - 1 && (
+                      <div style={{
+                        position: 'absolute',
+                        left: 16,
+                        top: 36,
+                        bottom: -20,
+                        width: 2,
+                        background: '#e2e8f0',
+                        zIndex: 1
+                      }} />
+                    )}
+
+                    <div style={{
+                      width: 32, height: 32, borderRadius: '50%', background: '#f1f5f9', color: '#475569',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700,
+                      border: '2px solid white', flexShrink: 0, zIndex: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                    }}>
+                      {getInitials(n.authorName || 'Me')}
+                    </div>
+
+                    <div style={{
+                      flex: 1,
+                      background: '#f8fafc',
+                      border: '1px solid #f1f5f9',
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{n.authorName}</span>
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                          {format(new Date(n.createdAt), 'MMM d, yyyy · hh:mm a')}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 13, color: '#334155', margin: 0, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                        {n.content}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {notes.length === 0 && (
+                  <div style={{ padding: '30px 0', textAlign: 'center', color: '#94a3b8' }}>
+                    <p style={{ fontSize: 13.5, margin: 0 }}>No comments or notes posted yet.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'log' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 16 }}>
+              {activities.map(a => (
+                <div key={a._id} style={{ display: 'flex', gap: 12, textAlign: 'left', fontSize: 12.5, padding: '6px 0' }}>
+                  <span style={{ color: '#94a3b8', fontSize: 11, minWidth: 60, whiteSpace: 'nowrap', paddingTop: 2 }}>{format(new Date(a.createdAt), 'hh:mm a')}</span>
+                  <div>
+                    <p style={{ color: '#334155', margin: 0, fontWeight: 500 }}>{a.content}</p>
+                    <span style={{ color: '#94a3b8', fontSize: 10.5 }}>By {a.performedBy?.name || 'System'} · {format(new Date(a.createdAt), 'MMM d, yyyy')}</span>
+                  </div>
+                </div>
+              ))}
+              {activities.length === 0 && <p style={{ fontSize: 13, color: '#94a3b8', padding: '12px 0' }}>No activity logs yet</p>}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── CreateTaskModal Component ──────────────────────────────────────────────
+export function CreateTaskModal({
+  isOpen,
+  onClose,
+  onRefresh,
+  agents
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onRefresh: () => void;
+  agents: any[];
+}) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [assignedTo, setAssignedTo] = useState('');
+  const [label, setLabel] = useState('Open');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTitle('');
+      setDescription('');
+      setAssignedTo('');
+      setLabel('Open');
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title || !assignedTo) {
+      toast.error('Title and assigned employee are required');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.post('/tasks', { title, description, assignedTo, label });
+      toast.success('Custom task created and assigned successfully!');
+      onRefresh();
+      onClose();
+    } catch {
+      toast.error('Failed to create custom task');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.35)',
+      backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', zIndex: 200, animation: 'fadeIn 0.2s ease'
+    }}>
+      <div style={{
+        background: 'white', borderRadius: 20, width: 460, maxWidth: '90%',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        padding: 30, display: 'flex', flexDirection: 'column', gap: 16
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ textAlign: 'left' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: 0, background: 'linear-gradient(135deg, #4f46e5, #6366f1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Create Custom Task</h3>
+            <p style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>Assign a new custom task to one of your agents.</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, borderRadius: '50%' }}><X size={18} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'left' }}>
+          <div>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Task Title *</label>
+            <input
+              type="text"
+              placeholder="e.g. Update client credentials"
+              className="form-control"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              required
+              style={{ borderRadius: 10, padding: '10px 14px', border: '1px solid #e2e8f0', fontSize: 13.5, width: '100%', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Description</label>
+            <textarea
+              placeholder="Provide clear steps or notes for this task..."
+              className="form-control"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={3}
+              style={{ borderRadius: 10, padding: '10px 14px', border: '1px solid #e2e8f0', fontSize: 13.5, width: '100%', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Assign Employee *</label>
+            <select
+              className="form-select"
+              value={assignedTo}
+              onChange={e => setAssignedTo(e.target.value)}
+              required
+              style={{ borderRadius: 10, padding: '10px 14px', border: '1px solid #e2e8f0', fontSize: 13.5, width: '100%', boxSizing: 'border-box', height: 42 }}
+            >
+              <option value="">Select Employee</option>
+              {agents.map(a => (
+                <option key={a._id} value={a._id}>{a.name} ({a.role})</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>Initial Label</label>
+            <select
+              className="form-select"
+              value={label}
+              onChange={e => setLabel(e.target.value)}
+              style={{ borderRadius: 10, padding: '10px 14px', border: '1px solid #e2e8f0', fontSize: 13.5, width: '100%', boxSizing: 'border-box', height: 42 }}
+            >
+              <option value="Open">Open</option>
+              <option value="Call Back">Call Back</option>
+              <option value="Follow Up">Follow Up</option>
+              <option value="Review">Review</option>
+              <option value="Closed">Closed</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
+            <button type="button" onClick={onClose} className="btn-secondary" style={{ flex: 1, justifyContent: 'center', height: 42, borderRadius: 10 }}>Cancel</button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn-primary"
+              style={{
+                flex: 1, justifyContent: 'center', height: 42, borderRadius: 10,
+                background: 'linear-gradient(135deg, #4f46e5, #6366f1)', color: 'white',
+                border: 'none', cursor: 'pointer', fontWeight: 600, boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)'
+              }}
+            >
+              {submitting ? 'Creating...' : 'Create Task'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 

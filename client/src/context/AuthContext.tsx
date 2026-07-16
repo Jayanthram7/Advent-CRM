@@ -14,7 +14,8 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<any>;
-  verifyOtp: (userId: string, otp: string) => Promise<void>;
+  verifyOtp: (userId: string, otp: string) => Promise<any>;
+  verifyEmailOtp: (userId: string, emailOtp: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
   isAdmin: boolean;
@@ -72,6 +73,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const verifyOtp = async (userId: string, otp: string) => {
     const response = await api.post('/auth/verify-otp', { userId, otp });
+    // Step 1 now returns { emailOtpRequired, userId, maskedEmail }
+    // Token is NOT issued yet — return data so the caller can proceed to step 2
+    return response.data;
+  };
+
+  const verifyEmailOtp = async (userId: string, emailOtp: string) => {
+    const response = await api.post('/auth/verify-email-otp', { userId, emailOtp });
     const { token: newToken, user: newUser } = response.data;
     localStorage.setItem('token', newToken);
     localStorage.setItem('user', JSON.stringify(newUser));
@@ -99,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       login,
       verifyOtp,
+      verifyEmailOtp,
       logout,
       loading,
       isAdmin: user?.role === 'Admin',

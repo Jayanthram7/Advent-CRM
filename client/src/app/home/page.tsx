@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 import {
   Target, TrendingUp, PhoneCall, Users, Calendar, Clock, CheckCircle,
-  Search, Mail, Bell, ArrowUpRight, Video, Plus, ChevronLeft, ChevronRight, Shield, ExternalLink
+  Search, Mail, Bell, ArrowUpRight, Video, Plus, ChevronLeft, ChevronRight, Shield, ExternalLink, MessageSquare
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -525,6 +525,26 @@ export default function HomePage() {
             <div style={{ fontSize: 13, color: '#64748b', marginTop: -6, marginBottom: 0 }}>Advent CRM powered by Advent Systems</div>
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <a
+              href="/team-chat"
+              style={{
+                background: 'white',
+                color: '#1a1f36',
+                border: '1px solid #cbd5e1',
+                padding: '10px 20px',
+                borderRadius: 30,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                textDecoration: 'none'
+              }}
+            >
+              <MessageSquare size={16} />
+              <span>Team Chat</span>
+            </a>
             <a
               href="/send-emails"
               style={{

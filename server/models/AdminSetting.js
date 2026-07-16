@@ -19,6 +19,9 @@ const adminSettingSchema = new mongoose.Schema({
   businessEndTime: {
     type: String,
     default: '17:30'
+  },
+  expiresAt: {
+    type: Date
   }
 }, { timestamps: true });
 

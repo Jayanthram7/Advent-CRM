@@ -6,6 +6,7 @@ const TssRecord = require('../models/TssRecord');
 const EventRecord = require('../models/EventRecord');
 const authMiddleware = require('../middleware/authMiddleware');
 const CalendarEvent = require('../models/CalendarEvent');
+const Task = require('../models/Task');
 
 router.use(authMiddleware);
 
@@ -450,9 +451,11 @@ router.get('/global-search', async (req, res) => {
 
     if (isSlash) {
       const User = require('../models/User');
-      const matchedAgents = await User.find({
-        name: regex
-      }).limit(5);
+      let agentQuery = { name: regex };
+      if (req.user.role === 'Agent') {
+        agentQuery._id = req.user._id;
+      }
+      const matchedAgents = await User.find(agentQuery).limit(100);
 
       const results = [];
       matchedAgents.forEach(agent => {
@@ -516,6 +519,15 @@ router.get('/global-search', async (req, res) => {
         { customerName: regex },
         { serialNumber: regex },
         { mobileNumber: regex }
+      ]
+    }).limit(5);
+
+    // Search Custom Tasks
+    const tasks = await Task.find({
+      ...baseQuery,
+      $or: [
+        { title: regex },
+        { description: regex }
       ]
     }).limit(5);
 
@@ -593,6 +605,17 @@ router.get('/global-search', async (req, res) => {
         company: t.customerName || '—',
         callerName: t.customerName || '—',
         url: `/tss/${t.datasetId}?search=${encodeURIComponent(t.customerName || '')}`
+      });
+    });
+
+    // Map Custom Tasks
+    tasks.forEach(t => {
+      results.push({
+        id: t._id,
+        type: 'Task',
+        company: t.title || '—',
+        callerName: t.description || '—',
+        url: `/tasks?search=${encodeURIComponent(t.title || '')}`
       });
     });
 

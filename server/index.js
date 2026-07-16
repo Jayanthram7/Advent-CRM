@@ -16,6 +16,8 @@ const claimRoutes = require('./routes/claims');
 const emailRoutes = require('./routes/emails');
 const calendarRoutes = require('./routes/calendar');
 const whatsappRoutes = require('./routes/whatsapp');
+const teamChatRoutes = require('./routes/team-chat');
+const taskRoutes = require('./routes/tasks');
 
 const app = express();
 
@@ -72,6 +74,8 @@ app.use('/api/claims', claimRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/team-chat', teamChatRoutes);
+app.use('/api/tasks', taskRoutes);
 
 app.get('/api/health', (req, res) => {
   const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };

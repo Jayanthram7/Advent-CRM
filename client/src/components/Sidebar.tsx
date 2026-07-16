@@ -278,8 +278,7 @@ export default function Sidebar() {
         {/* Events Sub-items */}
         {eventsOpen && !sidebarCollapsed && (
           <div style={{ marginLeft: 0 }}>
-            {user?.role !== 'Agent' && (
-              <div
+            <div
                 onClick={() => setIsEventImportModalOpen(true)}
                 className="sidebar-item"
                 style={{ paddingLeft: 38, fontSize: 13, cursor: 'pointer', color: '#38bdf8' }}
@@ -287,7 +286,6 @@ export default function Sidebar() {
                 <Upload size={13} style={{ opacity: 1 }} />
                 <span className="sidebar-item-text">Import Event</span>
               </div>
-            )}
 
             {eventDatasets.map((ds) => {
               const href = `/events/${ds._id}`;
@@ -315,6 +313,16 @@ export default function Sidebar() {
         >
           <CheckSquare size={15} />
           <span className="sidebar-item-text">Tasks</span>
+        </Link>
+
+        {/* Team Chat */}
+        <Link
+          href="/team-chat"
+          className={`sidebar-item ${pathname === '/team-chat' ? 'active' : ''}`}
+          style={{ display: 'flex', alignItems: 'center', gap: 10 }}
+        >
+          <MessageSquare size={15} />
+          <span className="sidebar-item-text">Team Chat</span>
         </Link>
 
 
@@ -791,6 +799,37 @@ function EventImportModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const downloadSampleFormat = async () => {
+    const XLSX = await import('xlsx');
+    const sampleData = [
+      {
+        'Hall Number': 'H1',
+        'Stall Number': 'S101',
+        'Company Name': 'Acme Corp',
+        'Contact Person': 'John Doe',
+        'Position': 'CEO',
+        'Email': 'john@acme.com',
+        'Mobile 1': '9876543210',
+        'Mobile 2': '9123456789',
+        'Address': '123 Main Street',
+        'Country': 'India',
+        'State': 'Tamil Nadu',
+        'Pincode': '600001',
+        'Website': 'www.acme.com',
+      }
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    // Set column widths for readability
+    worksheet['!cols'] = [
+      { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 20 }, { wch: 16 },
+      { wch: 26 }, { wch: 16 }, { wch: 16 }, { wch: 24 }, { wch: 12 },
+      { wch: 14 }, { wch: 10 }, { wch: 22 },
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Event Data');
+    XLSX.writeFile(workbook, 'event_import_format.xlsx');
+  };
+
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -801,7 +840,39 @@ function EventImportModal({ onClose }: { onClose: () => void }) {
         background: '#1e293b', padding: 24, borderRadius: 12,
         width: 400, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)', border: '1px solid #334155'
       }}>
-        <h3 style={{ margin: '0 0 16px 0', color: '#f8fafc', fontSize: 18 }}>Import Event Data</h3>
+        <h3 style={{ margin: '0 0 4px 0', color: '#f8fafc', fontSize: 18 }}>Import Event Data</h3>
+
+        {/* Download sample format hint */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.25)',
+          borderRadius: 8, padding: '10px 14px', marginBottom: 20, marginTop: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span style={{ fontSize: 12.5, color: '#94a3b8' }}>Need the correct column format?</span>
+          </div>
+          <button
+            onClick={downloadSampleFormat}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '5px 12px', background: 'rgba(14,165,233,0.15)',
+              border: '1px solid rgba(14,165,233,0.35)', borderRadius: 6,
+              color: '#38bdf8', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              whiteSpace: 'nowrap', transition: 'all 0.15s'
+            }}
+            onMouseOver={e => (e.currentTarget.style.background = 'rgba(14,165,233,0.25)')}
+            onMouseOut={e => (e.currentTarget.style.background = 'rgba(14,165,233,0.15)')}
+            title="Download sample Excel template"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download Format
+          </button>
+        </div>
         
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: '#94a3b8' }}>Event Name</label>

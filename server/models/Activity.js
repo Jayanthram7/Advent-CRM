@@ -17,6 +17,10 @@ const activitySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'EventRecord'
   },
+  task: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Task'
+  },
   type: {
     type: String,
     enum: ['Creation', 'Label', 'Note', 'Assignment', 'Conversion', 'DateUpdate', 'Update', 'WhatsApp', 'Email'],

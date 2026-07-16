@@ -17,6 +17,10 @@ const noteSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'EventRecord'
   },
+  task: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Task'
+  },
   content: {
     type: String,
     required: true,

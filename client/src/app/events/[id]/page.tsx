@@ -1300,6 +1300,10 @@ function EventPageContent({ id }: { id: string }) {
   const [filterLabel, setFilterLabel] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<EventRecord | null>(null);
+  const [bulkAction, setBulkAction] = useState<'labels' | 'date_followup' | 'date_install' | 'assign' | null>(null);
+  const [bulkLabel, setBulkLabel] = useState('Open');
+  const [bulkDate, setBulkDate] = useState('');
+  const [bulkAssignUser, setBulkAssignUser] = useState('');
   const [drawerTab, setDrawerTab] = useState<'details' | 'notes' | 'log'>('details');
   const [users, setUsers] = useState<any[]>([]);
   const [startDate, setStartDate] = useState('');
@@ -1378,6 +1382,58 @@ function EventPageContent({ id }: { id: string }) {
 
   const toggleSelect = (recId: string) => setSelectedIds(prev => prev.includes(recId) ? prev.filter(i => i !== recId) : [...prev, recId]);
   const toggleAll = () => setSelectedIds(prev => prev.length === records.length ? [] : records.map(l => l._id));
+
+  const bulkDeleteSelected = async () => {
+    if (!confirm(`Delete ${selectedIds.length} selected records? This cannot be undone.`)) return;
+    try {
+      await api.delete('/events/records/bulk', { data: { ids: selectedIds } });
+      toast.success(`${selectedIds.length} records deleted`);
+      setSelectedIds([]);
+      fetchRecords();
+    } catch { toast.error('Bulk delete failed'); }
+  };
+
+  const bulkApplyLabel = async (label: string) => {
+    try {
+      await api.post('/events/records/bulk/labels', { ids: selectedIds, labels: [label] });
+      toast.success(`Label updated for ${selectedIds.length} records`);
+      setSelectedIds([]);
+      setBulkAction(null);
+      fetchRecords();
+    } catch { toast.error('Bulk label update failed'); }
+  };
+
+  const bulkSetDate = async (type: 'followUpDate' | 'installationDate', dateVal: string) => {
+    if (!dateVal) { toast.error('Please select a date'); return; }
+    try {
+      await Promise.all(selectedIds.map(id => api.post(`/events/records/${id}/date`, { [type]: dateVal })));
+      toast.success(`Date set for ${selectedIds.length} records`);
+      setSelectedIds([]);
+      setBulkAction(null);
+      setBulkDate('');
+      fetchRecords();
+    } catch { toast.error('Bulk date update failed'); }
+  };
+
+  const bulkAssign = async (userId: string) => {
+    try {
+      await api.put('/events/records/bulk/assign', { ids: selectedIds, assignedTo: userId });
+      toast.success(`${selectedIds.length} records assigned`);
+      setSelectedIds([]);
+      setBulkAction(null);
+      fetchRecords();
+    } catch { toast.error('Bulk assign failed'); }
+  };
+
+  const bulkConvert = async () => {
+    if (!confirm(`Mark ${selectedIds.length} records as Completed?`)) return;
+    try {
+      await api.post('/events/records/bulk/convert', { ids: selectedIds });
+      toast.success(`${selectedIds.length} records marked as Completed`);
+      setSelectedIds([]);
+      fetchRecords();
+    } catch { toast.error('Bulk convert failed'); }
+  };
 
   // Client-side Excel generation & downloading
   const handleExportExcel = async () => {
@@ -1648,6 +1704,156 @@ function EventPageContent({ id }: { id: string }) {
             <div style={{ flex: 1, overflow: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 10, boxShadow: '0 1px 0 #e2e8f0' }}>
+                  {/* Bulk Action Toolbar */}
+                  {selectedIds.length > 0 && (
+                    <tr>
+                      <td colSpan={10} style={{ padding: 0 }}>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          background: 'linear-gradient(90deg, #1e293b 0%, #0f172a 100%)',
+                          padding: '10px 16px', flexWrap: 'wrap'
+                        }}>
+                          {/* Count + deselect */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#38bdf8', background: 'rgba(56,189,248,0.15)', border: '1px solid rgba(56,189,248,0.3)', borderRadius: 6, padding: '3px 10px' }}>
+                              {selectedIds.length} selected
+                            </span>
+                            <button
+                              onClick={() => { setSelectedIds([]); setBulkAction(null); }}
+                              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '4px 8px', color: '#94a3b8', cursor: 'pointer', fontSize: 12 }}
+                            >✕ Clear</button>
+                          </div>
+
+                          <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+
+                          {/* Add Label */}
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              onClick={() => setBulkAction(bulkAction === 'labels' ? null : 'labels')}
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '5px 12px', color: '#e2e8f0', cursor: 'pointer', fontSize: 12.5, fontWeight: 500 }}
+                            >
+                              <Tag size={13} /> Add Label
+                            </button>
+                            {bulkAction === 'labels' && (
+                              <div style={{ position: 'absolute', top: '110%', left: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: 12, zIndex: 50, minWidth: 180 }}>
+                                <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>SELECT LABEL</p>
+                                {LABEL_OPTIONS.filter(lbl => isAdmin || lbl !== 'Closed').map(lbl => (
+                                  <label key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer', fontSize: 13 }}>
+                                    <input type="radio" checked={bulkLabel === lbl} onChange={() => setBulkLabel(lbl)} />
+                                    {lbl}
+                                  </label>
+                                ))}
+                                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                                  <button className="btn-primary" onClick={() => bulkApplyLabel(bulkLabel)} style={{ flex: 1, justifyContent: 'center', padding: '7px', fontSize: 12 }}>Apply</button>
+                                  <button className="btn-secondary" onClick={() => setBulkAction(null)} style={{ padding: '7px 10px', fontSize: 12 }}>Cancel</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Set Follow-up Date */}
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              onClick={() => setBulkAction(bulkAction === 'date_followup' ? null : 'date_followup')}
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '5px 12px', color: '#e2e8f0', cursor: 'pointer', fontSize: 12.5, fontWeight: 500 }}
+                            >
+                              <Clock size={13} /> Follow-up Date
+                            </button>
+                            {bulkAction === 'date_followup' && (
+                              <div style={{ position: 'absolute', top: '110%', left: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: 12, zIndex: 50, minWidth: 200 }}>
+                                <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>SET FOLLOW-UP DATE</p>
+                                <input type="date" className="form-input" value={bulkDate} onChange={e => setBulkDate(e.target.value)} style={{ marginBottom: 10 }} />
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button className="btn-primary" onClick={() => bulkSetDate('followUpDate', bulkDate)} style={{ flex: 1, justifyContent: 'center', padding: '7px', fontSize: 12 }}>Save</button>
+                                  <button className="btn-secondary" onClick={() => { setBulkAction(null); setBulkDate(''); }} style={{ padding: '7px 10px', fontSize: 12 }}>Cancel</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Set Installation Date */}
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              onClick={() => setBulkAction(bulkAction === 'date_install' ? null : 'date_install')}
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '5px 12px', color: '#e2e8f0', cursor: 'pointer', fontSize: 12.5, fontWeight: 500 }}
+                            >
+                              <Calendar size={13} /> Installation Date
+                            </button>
+                            {bulkAction === 'date_install' && (
+                              <div style={{ position: 'absolute', top: '110%', left: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: 12, zIndex: 50, minWidth: 200 }}>
+                                <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>SET INSTALLATION DATE</p>
+                                <input type="date" className="form-input" value={bulkDate} onChange={e => setBulkDate(e.target.value)} style={{ marginBottom: 10 }} />
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button className="btn-primary" onClick={() => bulkSetDate('installationDate', bulkDate)} style={{ flex: 1, justifyContent: 'center', padding: '7px', fontSize: 12 }}>Save</button>
+                                  <button className="btn-secondary" onClick={() => { setBulkAction(null); setBulkDate(''); }} style={{ padding: '7px 10px', fontSize: 12 }}>Cancel</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Assign To — Admin only */}
+                          {isAdmin && (
+                            <div style={{ position: 'relative' }}>
+                              <button
+                                onClick={() => setBulkAction(bulkAction === 'assign' ? null : 'assign')}
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '5px 12px', color: '#e2e8f0', cursor: 'pointer', fontSize: 12.5, fontWeight: 500 }}
+                              >
+                                <User size={13} /> Assign To
+                              </button>
+                              {bulkAction === 'assign' && (
+                                <div style={{ position: 'absolute', top: '110%', left: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: 12, zIndex: 50, minWidth: 220 }}>
+                                  <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>ASSIGN TO AGENT</p>
+                                  <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    {users.map((u: any) => (
+                                      <div
+                                        key={u._id}
+                                        className="dropdown-item"
+                                        onClick={() => bulkAssign(u._id)}
+                                        style={{ fontSize: 13, padding: '8px 10px', background: bulkAssignUser === u._id ? '#f0f7ff' : 'transparent', color: bulkAssignUser === u._id ? '#1a73e8' : 'inherit' }}
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                          <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
+                                            {u.name.split(' ').map((n: string) => n[0]).join('')}
+                                          </div>
+                                          <div>
+                                            <div>{u.name}</div>
+                                            <div style={{ fontSize: 10, color: '#9ca3af' }}>{u.role}</div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f2f7' }}>
+                                    <button className="btn-secondary" onClick={() => setBulkAction(null)} style={{ width: '100%', justifyContent: 'center', padding: '7px', fontSize: 12 }}>Cancel</button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Mark as Completed — Admin only */}
+                          {isAdmin && (
+                            <button
+                              onClick={bulkConvert}
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.35)', borderRadius: 6, padding: '5px 12px', color: '#6ee7b7', cursor: 'pointer', fontSize: 12.5, fontWeight: 500 }}
+                            >
+                              <CheckCircle size={13} /> Mark Completed
+                            </button>
+                          )}
+
+                          {/* Delete — Admin only */}
+                          {isAdmin && (
+                            <button
+                              onClick={bulkDeleteSelected}
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '5px 12px', color: '#fca5a5', cursor: 'pointer', fontSize: 12.5, fontWeight: 500, marginLeft: 'auto' }}
+                            >
+                              <Trash2 size={13} /> Delete Selected
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   <tr>
                     <th style={{ padding: '12px 16px', width: 40 }}>
                       <input type="checkbox" checked={records.length > 0 && selectedIds.length === records.length} onChange={toggleAll} style={{ cursor: 'pointer' }} />
@@ -1687,24 +1893,21 @@ function EventPageContent({ id }: { id: string }) {
                           <input type="checkbox" checked={selectedIds.includes(r._id)} onChange={() => toggleSelect(r._id)} style={{ cursor: 'pointer' }} />
                         </td>
                         <td style={{ padding: '12px 12px', fontSize: 13, color: '#475569' }}>
-                          {r.hallNumber && r.stallNumber
-                            ? `Hall ${r.hallNumber} / Stall ${r.stallNumber}`
-                            : r.hallNumber
-                              ? `Hall ${r.hallNumber}`
-                              : r.stallNumber
-                                ? `Stall ${r.stallNumber}`
-                                : '—'}
+                          {[r.hallNumber, r.stallNumber].filter(Boolean).join(' / ') || '—'}
                         </td>
                         <td style={{ padding: '12px 12px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13.5, maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.companyName || '-'}>
-                              {r.companyName || '-'}
-                            </div>
+                            {r.companyName && (
+                              <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13.5, maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.companyName}>
+                                {r.companyName}
+                              </div>
+                            )}
                             {r.contactPerson && (
                               <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }} title={r.contactPerson}>
                                 {r.contactPerson}
                               </div>
                             )}
+                            {!r.companyName && !r.contactPerson && <span style={{ color: '#d1d5db', fontSize: 13 }}>—</span>}
                           </div>
                         </td>
                         <td style={{ padding: '12px 12px', color: '#475569', fontSize: 13 }}>{r.mobile1 || r.mobile2 || '-'}</td>
