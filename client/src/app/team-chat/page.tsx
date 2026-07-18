@@ -46,7 +46,7 @@ export default function TeamChatPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [usersLoading, setUsersLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch users list
   const fetchUsers = async (showLoading = true) => {
@@ -81,6 +81,9 @@ export default function TeamChatPage() {
   // Initial load
   useEffect(() => {
     fetchUsers();
+    return () => {
+      localStorage.removeItem('active_chat_user_id');
+    };
   }, []);
 
   // Poll for new messages every 3 seconds
@@ -94,13 +97,34 @@ export default function TeamChatPage() {
     return () => clearInterval(timer);
   }, [selectedUser]);
 
+  const prevMessagesCountRef = useRef(0);
+  const prevSelectedUserRef = useRef<string | null>(null);
+
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (messagesContainerRef.current) {
+      const isNewChat = prevSelectedUserRef.current !== selectedUser?._id;
+      const hasNewMessages = messages.length > prevMessagesCountRef.current;
+
+      if (isNewChat) {
+        messagesContainerRef.current.scrollTo({
+          top: messagesContainerRef.current.scrollHeight,
+          behavior: 'auto'
+        });
+      } else if (hasNewMessages) {
+        messagesContainerRef.current.scrollTo({
+          top: messagesContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }
+    prevMessagesCountRef.current = messages.length;
+    prevSelectedUserRef.current = selectedUser?._id || null;
+  }, [messages, selectedUser]);
 
   const handleSelectUser = (u: ChatUser) => {
     setSelectedUser(u);
+    localStorage.setItem('active_chat_user_id', u._id);
     fetchHistory(u._id);
   };
 
@@ -346,7 +370,7 @@ export default function TeamChatPage() {
                 </div>
 
                 {/* Messages View Area */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+                <div ref={messagesContainerRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
                   {messagesLoading && messages.length === 0 ? (
                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                       <div className="spinner spinner-dark" />
@@ -430,7 +454,6 @@ export default function TeamChatPage() {
                         </div>
                       ))}
 
-                      <div ref={messagesEndRef} />
                     </div>
                   )}
                 </div>

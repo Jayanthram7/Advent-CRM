@@ -9,6 +9,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Advent CRM — Customer Relationship Management',
   description: 'Professional CRM Platform for modern sales teams',
+  icons: {
+    icon: '/Logo.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -28,6 +28,12 @@ export default function ProtectedLayout({ children, requiredRole }: ProtectedLay
   const pathname = usePathname();
   const [showDock, setShowDock] = useState(true);
 
+  // Desktop Notifications refs
+  const prevUnreadsRef = useRef<Record<string, number>>({});
+  const prevWhatsappChatsRef = useRef<Record<string, { count: number; lastTimestamp: string }>>({});
+  const isFirstTeamChatRef = useRef(true);
+  const isFirstWhatsappRef = useRef(true);
+
   // Dragging states
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -237,6 +243,126 @@ export default function ProtectedLayout({ children, requiredRole }: ProtectedLay
     return () => clearInterval(interval);
   }, [user]);
 
+  // Request desktop notification permission and poll for new chat messages
+  useEffect(() => {
+    if (!user) return;
+
+    // Request notification permission if not already granted
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().catch(err => {
+          console.error('Error requesting notification permission:', err);
+        });
+      }
+    }
+
+    const showDesktopNotification = (title: string, body: string) => {
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(title, {
+            body: body,
+            icon: '/Logo.png'
+          });
+        } catch (e) {
+          console.error('Failed to trigger native notification:', e);
+        }
+      }
+    };
+
+    const checkTeamChat = async () => {
+      try {
+        const res = await api.get('/team-chat/users');
+        const chatUsers = res.data || [];
+
+        if (!isFirstTeamChatRef.current) {
+          chatUsers.forEach((u: any) => {
+            const prevUnread = prevUnreadsRef.current[u._id] || 0;
+            if (u.unreadCount > prevUnread) {
+              const activeChatUserId = localStorage.getItem('active_chat_user_id');
+              const isCurrentChat = pathname === '/team-chat' && activeChatUserId === u._id;
+
+              if (document.hidden || !isCurrentChat) {
+                showDesktopNotification(
+                  `New message from ${u.name}`,
+                  u.lastMessage || 'Sent you a message'
+                );
+              }
+            }
+          });
+        } else {
+          isFirstTeamChatRef.current = false;
+        }
+
+        // Update previous unread counts
+        const currentUnreads: Record<string, number> = {};
+        chatUsers.forEach((u: any) => {
+          currentUnreads[u._id] = u.unreadCount || 0;
+        });
+        prevUnreadsRef.current = currentUnreads;
+      } catch (err) {
+        console.error('Error polling team chat for notifications:', err);
+      }
+    };
+
+    const checkWhatsapp = async () => {
+      if (user.role !== 'Admin') return;
+      try {
+        const res = await api.get('/whatsapp/chats');
+        const activeChats = res.data || [];
+
+        if (!isFirstWhatsappRef.current) {
+          activeChats.forEach((c: any) => {
+            const prevChat = prevWhatsappChatsRef.current[c._id];
+            const hasNewMessage = prevChat
+              ? (c.count > prevChat.count || new Date(c.lastTimestamp) > new Date(prevChat.lastTimestamp))
+              : true;
+
+            if (hasNewMessage && c.lastSender === 'User') {
+              const activeWhatsappPhone = localStorage.getItem('active_whatsapp_phone');
+              const isCurrentChat = pathname === '/whatsapp' && activeWhatsappPhone === c._id;
+
+              if (document.hidden || !isCurrentChat) {
+                showDesktopNotification(
+                  `WhatsApp from ${c._id}`,
+                  c.lastMessage || 'New message received'
+                );
+              }
+            }
+          });
+        } else {
+          isFirstWhatsappRef.current = false;
+        }
+
+        // Update previous chats state
+        const currentChats: Record<string, { count: number; lastTimestamp: string }> = {};
+        activeChats.forEach((c: any) => {
+          currentChats[c._id] = {
+            count: c.count || 0,
+            lastTimestamp: c.lastTimestamp || ''
+          };
+        });
+        prevWhatsappChatsRef.current = currentChats;
+      } catch (err) {
+        console.error('Error polling WhatsApp chats for notifications:', err);
+      }
+    };
+
+    // Initial checks
+    checkTeamChat();
+    if (user.role === 'Admin') {
+      checkWhatsapp();
+    }
+
+    // Set intervals
+    const teamChatInterval = setInterval(checkTeamChat, 4000);
+    const whatsappInterval = setInterval(checkWhatsapp, 5000);
+
+    return () => {
+      clearInterval(teamChatInterval);
+      clearInterval(whatsappInterval);
+    };
+  }, [user, pathname]);
+
   // Load dock visibility preference and listen for Ctrl+H
   useEffect(() => {
     if (pathname === '/team-chat') {
@@ -325,7 +451,9 @@ export default function ProtectedLayout({ children, requiredRole }: ProtectedLay
       <div 
         className={`main-layout ${sidebarCollapsed ? 'collapsed' : ''}`}
         style={{ 
-          paddingBottom: showDock ? '110px' : '24px',
+          paddingBottom: pathname === '/team-chat' ? '0px' : (showDock ? '110px' : '24px'),
+          height: pathname === '/team-chat' ? '100vh' : 'auto',
+          overflow: pathname === '/team-chat' ? 'hidden' : 'visible',
           transition: 'padding-bottom 0.2s ease-in-out'
         }}
       >

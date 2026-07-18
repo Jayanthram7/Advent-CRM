@@ -61,7 +61,7 @@ export default function WhatsappPage() {
   const [simulatorPhone, setSimulatorPhone] = useState('+15550100');
   const [simulatorInput, setSimulatorInput] = useState('');
   const [simulatorSending, setSimulatorSending] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch all settings
   const fetchSettings = async () => {
@@ -118,19 +118,43 @@ export default function WhatsappPage() {
   useEffect(() => {
     fetchSettings();
     fetchChats();
+    return () => {
+      localStorage.removeItem('active_whatsapp_phone');
+    };
   }, []);
 
   useEffect(() => {
     if (selectedPhone) {
       fetchChatHistory(selectedPhone);
+      localStorage.setItem('active_whatsapp_phone', selectedPhone);
+    } else {
+      localStorage.removeItem('active_whatsapp_phone');
     }
   }, [selectedPhone]);
 
+  const prevMessagesCountRef = useRef(0);
+  const prevSelectedPhoneRef = useRef<string>('');
+
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      const isNewChat = prevSelectedPhoneRef.current !== selectedPhone;
+      const hasNewMessages = chatMessages.length > prevMessagesCountRef.current;
+
+      if (isNewChat) {
+        chatContainerRef.current.scrollTo({
+          top: chatContainerRef.current.scrollHeight,
+          behavior: 'auto'
+        });
+      } else if (hasNewMessages) {
+        chatContainerRef.current.scrollTo({
+          top: chatContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
     }
-  }, [chatMessages]);
+    prevMessagesCountRef.current = chatMessages.length;
+    prevSelectedPhoneRef.current = selectedPhone;
+  }, [chatMessages, selectedPhone]);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -737,7 +761,7 @@ Fallback instruction: Ask user to leave email/phone number if Q not answered."
                   </div>
 
                   {/* Message bubble pane */}
-                  <div className="flex-1 p-4 overflow-y-auto bg-slate-50/50 flex flex-col gap-3">
+                  <div ref={chatContainerRef} className="flex-1 p-4 overflow-y-auto bg-slate-50/50 flex flex-col gap-3">
                     {chatLoading ? (
                       <div className="flex justify-center p-8">
                         <div className="spinner spinner-dark" />
@@ -766,7 +790,6 @@ Fallback instruction: Ask user to leave email/phone number if Q not answered."
                         );
                       })
                     )}
-                    <div ref={chatEndRef} />
                   </div>
 
                   {/* Simulator send input */}
