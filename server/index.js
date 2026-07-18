@@ -41,6 +41,15 @@ const connectDB = async () => {
       console.log('✅ MongoDB connected');
       await seedAdmin();
       await seedTemplates();
+      
+      // Start automated daily reports scheduler (everyday at 6:30 PM)
+      try {
+        const { startDailyReportScheduler } = require('./utils/reportScheduler');
+        startDailyReportScheduler();
+      } catch (schErr) {
+        console.error('Failed to start daily report scheduler:', schErr);
+      }
+
       return m;
     }).catch(err => {
       dbPromise = null;

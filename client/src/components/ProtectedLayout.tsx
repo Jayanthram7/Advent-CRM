@@ -5,6 +5,32 @@ import { useAuth } from '@/context/AuthContext';
 import Sidebar from './Sidebar';
 import { Search, Mail, Bell, X, Compass, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
+import toast from 'react-hot-toast';
+
+// Premium synthesized audio chime fallback using Web Audio API
+const playNotificationSound = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const playTone = (freq: number, start: number, duration: number) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.15, start);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(start);
+      osc.stop(start + duration);
+    };
+    const now = audioCtx.currentTime;
+    playTone(587.33, now, 0.15); // D5 chime
+    playTone(880.00, now + 0.12, 0.3); // A5 chime
+  } catch (e) {
+    console.warn('AudioContext failed to play sound:', e);
+  }
+};
 
 interface ProtectedLayoutProps {
   children: React.ReactNode;
@@ -257,6 +283,23 @@ export default function ProtectedLayout({ children, requiredRole }: ProtectedLay
     }
 
     const showDesktopNotification = (title: string, body: string) => {
+      // 1. Play synthesized audio chime
+      playNotificationSound();
+
+      // 2. Show in-app toast fallback
+      toast(`💬 ${title}: ${body}`, {
+        duration: 4500,
+        style: {
+          background: '#0f172a',
+          color: '#f8fafc',
+          border: '1px solid #334155',
+          borderRadius: '12px',
+          fontSize: '13.5px',
+          fontWeight: 500
+        }
+      });
+
+      // 3. Trigger native browser push notification if permitted
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
         try {
           new Notification(title, {

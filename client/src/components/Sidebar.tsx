@@ -6,7 +6,7 @@ import {
   Home, Users, Target, LogOut,
   ChevronDown, ChevronRight, ChevronLeft, Circle,
   Inbox, Clock, Calendar, CheckCircle2,
-  Database, Upload, FileText, X, Phone, Building2, Contact, CheckSquare, Award, Mail, MessageSquare
+  Database, Upload, FileText, X, Phone, Building2, Contact, CheckSquare, Award, Mail, MessageSquare, BarChart2
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -415,6 +415,23 @@ export default function Sidebar() {
             >
               <Users size={15} />
               <span className="sidebar-item-text">Users</span>
+            </div>
+            <div
+              onClick={() => {
+                if (pathname !== '/reports') {
+                  if (user?.email === 'jayanthramnithin@gmail.com') {
+                    router.push('/reports');
+                  } else {
+                    setAdminTargetRoute('/reports');
+                    setAdminAuthStep(1);
+                  }
+                }
+              }}
+              className={`sidebar-item ${pathname === '/reports' ? 'active' : ''}`}
+              style={{ cursor: 'pointer', display: 'flex', justifyContent: sidebarCollapsed ? 'center' : 'flex-start', marginTop: 4 }}
+            >
+              <BarChart2 size={15} />
+              <span className="sidebar-item-text">Reports</span>
             </div>
             <div
               onClick={() => {

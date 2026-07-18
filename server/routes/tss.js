@@ -3,6 +3,7 @@ const router = express.Router();
 const TssDataset = require('../models/TssDataset');
 const TssRecord = require('../models/TssRecord');
 const TssSetting = require('../models/TssSetting');
+const Activity = require('../models/Activity');
 const roleMiddleware = require('../middleware/roleMiddleware');
 const protect = require('../middleware/authMiddleware');
 
@@ -176,8 +177,23 @@ router.put('/records/:id/labels', async (req, res) => {
       { labels, ...(status && { status }) },
       { new: true }
     );
+    if (!record) return res.status(404).json({ message: 'Record not found' });
+
+    // Log Activity: Labels
+    if (labels && Array.isArray(labels)) {
+      await Activity.create({
+        tssRecord: record._id,
+        type: 'Label',
+        content: `Labels updated to: ${labels.join(', ')} by ${req.user.name}`,
+        performedBy: req.user._id
+      });
+    }
+
     res.json(record);
-  } catch (err) { res.status(500).json({ message: 'Server error' }); }
+  } catch (err) { 
+    console.error('Error updating TSS labels:', err);
+    res.status(500).json({ message: 'Server error' }); 
+  }
 });
 
 // PUT /api/tss/records/:id/dates
@@ -188,9 +204,27 @@ router.put('/records/:id/dates', async (req, res) => {
     if (callbackDate !== undefined) update.callbackDate = callbackDate;
     if (followUpDate !== undefined) update.followUpDate = followUpDate;
     if (renewalDate !== undefined) update.renewalDate = renewalDate;
+    
     const record = await TssRecord.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!record) return res.status(404).json({ message: 'Record not found' });
+
+    // Log Activity: Date update
+    const dateVal = callbackDate || followUpDate || renewalDate;
+    if (dateVal) {
+      const dateType = callbackDate ? 'Callback' : followUpDate ? 'Follow-up' : 'Renewal';
+      await Activity.create({
+        tssRecord: record._id,
+        type: 'DateUpdate',
+        content: `${dateType} date set to ${new Date(dateVal).toLocaleDateString()} by ${req.user.name}`,
+        performedBy: req.user._id
+      });
+    }
+
     res.json(record);
-  } catch (err) { res.status(500).json({ message: 'Server error' }); }
+  } catch (err) { 
+    console.error('Error updating TSS dates:', err);
+    res.status(500).json({ message: 'Server error' }); 
+  }
 });
 
 // POST /api/tss/records/:id/notes

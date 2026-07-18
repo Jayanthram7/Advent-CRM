@@ -17,6 +17,10 @@ const activitySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'EventRecord'
   },
+  tssRecord: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'TssRecord'
+  },
   task: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Task'
