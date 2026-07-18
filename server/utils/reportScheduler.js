@@ -7,16 +7,15 @@ const Activity = require('../models/Activity');
 const AdminSetting = require('../models/AdminSetting');
 const sendEmail = require('./mailer');
 
-const sendDailyReportHelper = async (targetDate) => {
-  const startOfDay = new Date(targetDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(targetDate);
-  endOfDay.setHours(23, 59, 59, 999);
+const sendDailyReportHelper = async (dateStr) => {
+  const startOfDay = new Date(`${dateStr}T00:00:00+05:30`);
+  const endOfDay = new Date(`${dateStr}T23:59:59.999+05:30`);
 
   const formattedDateString = startOfDay.toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'long',
-    year: 'numeric'
+    year: 'numeric',
+    timeZone: 'Asia/Kolkata'
   });
 
   // Fetch active users, excluding super-admin and jayanth accounts
@@ -250,18 +249,32 @@ const startDailyReportScheduler = () => {
   setInterval(async () => {
     try {
       const now = new Date();
-      const currentHour = now.getHours();
-      const currentMinute = now.getMinutes();
+      
+      // Determine current time parts in IST (Asia/Kolkata)
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour12: false,
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric'
+      });
+      const parts = formatter.formatToParts(now);
+      const tInfo = {};
+      parts.forEach(p => { tInfo[p.type] = p.value; });
 
-      // Everyday at 6:30 PM (18:30) local time
-      if (currentHour === 18 && currentMinute === 30) {
-        const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD local format
-        
+      const currentHour = parseInt(tInfo.hour, 10);
+      const currentMinute = parseInt(tInfo.minute, 10);
+      const todayStr = `${tInfo.year}-${String(tInfo.month).padStart(2, '0')}-${String(tInfo.day).padStart(2, '0')}`;
+
+      // Everyday at 7:00 PM (19:00) IST
+      if (currentHour === 19 && currentMinute === 0) {
         let setting = await AdminSetting.findOne({ type: 'last_daily_report_sent' });
         if (!setting || setting.password !== todayStr) {
-          console.log(`[Scheduler] Time matches 18:30 (6:30 PM). Sending daily report for ${todayStr}...`);
+          console.log(`[Scheduler] Time matches 19:00 IST (7:00 PM). Sending daily report for ${todayStr}...`);
           
-          await sendDailyReportHelper(now);
+          await sendDailyReportHelper(todayStr);
           
           if (!setting) {
             await AdminSetting.create({ type: 'last_daily_report_sent', password: todayStr });

@@ -594,11 +594,24 @@ router.get('/reports', roleMiddleware('Admin'), async (req, res) => {
     const { date } = req.query;
     
     // Parse target date and set day bounds
-    const targetDate = date ? new Date(date) : new Date();
-    const startOfDay = new Date(targetDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(targetDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Parse target date and set day bounds in IST (+05:30)
+    let dateStr;
+    if (date) {
+      dateStr = date;
+    } else {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric'
+      });
+      const parts = formatter.formatToParts(new Date());
+      const tInfo = {};
+      parts.forEach(p => { tInfo[p.type] = p.value; });
+      dateStr = `${tInfo.year}-${String(tInfo.month).padStart(2, '0')}-${String(tInfo.day).padStart(2, '0')}`;
+    }
+    const startOfDay = new Date(`${dateStr}T00:00:00+05:30`);
+    const endOfDay = new Date(`${dateStr}T23:59:59.999+05:30`);
 
     // Get active users, excluding super-admin and jayanth accounts
     const allUsers = await User.find({ status: 'Active' }).select('name email role');
@@ -713,16 +726,30 @@ router.post('/reports/send', roleMiddleware('Admin'), async (req, res) => {
       return res.status(400).json({ message: 'At least one recipient email is required' });
     }
 
-    const targetDate = date ? new Date(date) : new Date();
-    const startOfDay = new Date(targetDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(targetDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Parse target date and set day bounds in IST (+05:30)
+    let dateStr;
+    if (date) {
+      dateStr = date;
+    } else {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric'
+      });
+      const parts = formatter.formatToParts(new Date());
+      const tInfo = {};
+      parts.forEach(p => { tInfo[p.type] = p.value; });
+      dateStr = `${tInfo.year}-${String(tInfo.month).padStart(2, '0')}-${String(tInfo.day).padStart(2, '0')}`;
+    }
+    const startOfDay = new Date(`${dateStr}T00:00:00+05:30`);
+    const endOfDay = new Date(`${dateStr}T23:59:59.999+05:30`);
 
     const formattedDateString = startOfDay.toLocaleDateString('en-IN', {
       day: 'numeric',
       month: 'long',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata'
     });
 
     // Fetch active users, excluding super-admin and jayanth accounts

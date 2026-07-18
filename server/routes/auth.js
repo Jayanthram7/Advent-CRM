@@ -45,7 +45,7 @@ const generateAndSendEmailOTP = async (user) => {
     { upsert: true, new: true }
   );
 
-  const now = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  const now = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
   sendEmail({
     to: user.email,
     subject: `Your Login OTP — ${emailOtp}`,
