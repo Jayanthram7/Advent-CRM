@@ -115,8 +115,17 @@ router.post('/login', async (req, res) => {
       const startMinutesTotal = startH * 60 + startM;
       const endMinutesTotal = endH * 60 + endM;
 
-      const now = new Date();
-      const timeInMinutes = now.getHours() * 60 + now.getMinutes();
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: 'numeric',
+        hourCycle: 'h23'
+      }).formatToParts(new Date());
+      const hourPart = parts.find(p => p.type === 'hour');
+      const minutePart = parts.find(p => p.type === 'minute');
+      const nowH = hourPart ? parseInt(hourPart.value, 10) : 0;
+      const nowM = minutePart ? parseInt(minutePart.value, 10) : 0;
+      const timeInMinutes = nowH * 60 + nowM;
       
       if (timeInMinutes < startMinutesTotal || timeInMinutes > endMinutesTotal) {
         isOutsideHours = true;

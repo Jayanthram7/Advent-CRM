@@ -36,10 +36,17 @@ const authMiddleware = async (req, res, next) => {
       const startMinutesTotal = startH * 60 + startM;
       const endMinutesTotal = endH * 60 + endM;
 
-      const now = new Date();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
-      const timeInMinutes = hours * 60 + minutes;
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: 'numeric',
+        hourCycle: 'h23'
+      }).formatToParts(new Date());
+      const hourPart = parts.find(p => p.type === 'hour');
+      const minutePart = parts.find(p => p.type === 'minute');
+      const nowH = hourPart ? parseInt(hourPart.value, 10) : 0;
+      const nowM = minutePart ? parseInt(minutePart.value, 10) : 0;
+      const timeInMinutes = nowH * 60 + nowM;
       
       if (timeInMinutes < startMinutesTotal || timeInMinutes > endMinutesTotal) {
         return res.status(403).json({ 
