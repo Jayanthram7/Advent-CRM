@@ -99,6 +99,10 @@ callSchema.index({ firstName: 'text', lastName: 'text', email: 'text', company: 
 
 // Pre-save hook to keep labels and status in sync and enforce single label
 callSchema.pre('save', function (next) {
+  if (this.followUpDate) {
+    this.labels = ['Follow Up'];
+  }
+
   // 1. Enforce single label
   if (!this.labels || this.labels.length === 0) {
     this.labels = ['Open'];
@@ -125,6 +129,10 @@ callSchema.pre('save', function (next) {
 callSchema.pre('findOneAndUpdate', function (next) {
   const update = this.getUpdate();
   if (!update) return next();
+
+  if (update.followUpDate) {
+    update.labels = ['Follow Up'];
+  }
 
   let labels = update.labels;
   let status = update.status;

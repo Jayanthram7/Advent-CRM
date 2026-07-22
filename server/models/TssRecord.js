@@ -23,6 +23,10 @@ const tssRecordSchema = new mongoose.Schema({
 
 // Pre-save hook to keep labels and status in sync and enforce single label
 tssRecordSchema.pre('save', function (next) {
+  if (this.followUpDate) {
+    this.labels = ['Follow Up'];
+  }
+
   // 1. Enforce single label
   if (!this.labels || this.labels.length === 0) {
     this.labels = ['Open'];
@@ -43,6 +47,10 @@ tssRecordSchema.pre('save', function (next) {
 tssRecordSchema.pre('findOneAndUpdate', function (next) {
   const update = this.getUpdate();
   if (!update) return next();
+
+  if (update.followUpDate) {
+    update.labels = ['Follow Up'];
+  }
 
   let labels = update.labels;
   let status = update.status;

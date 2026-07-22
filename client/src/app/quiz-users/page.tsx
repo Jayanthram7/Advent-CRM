@@ -5,7 +5,7 @@ import TopBar from '@/components/TopBar';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { 
-  Search, Trash2, Mail, Phone, Building2, Award, Calendar, UserPlus, X, Plus, Check
+  Search, Trash2, Mail, Phone, Building2, Award, Calendar, UserPlus, X, Plus, Check, Eye
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -15,8 +15,12 @@ interface QuizUser {
   phone: string;
   email: string;
   organization: string;
+  userDescription?: string;
+  helpWith?: string;
   score: number;
   totalQuestions: number;
+  level?: number;
+  attempt?: number;
   createdAt: string;
   isConverted?: boolean;
 }
@@ -148,6 +152,184 @@ function CreateLeadModal({
   );
 }
 
+// ─── Quiz User Details Modal ────────────────────────────────────────────────
+function QuizUserDetailsModal({
+  claim,
+  onClose,
+  onConvert
+}: {
+  claim: QuizUser;
+  onClose: () => void;
+  onConvert: (claim: QuizUser) => void;
+}) {
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .filter(Boolean)
+      .map(n => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'Q';
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 550 }}>
+        <div className="modal-header">
+          <h2 className="modal-title">Quiz Submission Details</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}>
+            <X size={20} />
+          </button>
+        </div>
+        <div className="modal-body" style={{ padding: '24px' }}>
+          {/* Header Profile Section */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+            <div className="avatar" style={{ 
+              width: 56, 
+              height: 56, 
+              fontSize: 18, 
+              fontWeight: 700, 
+              background: '#e0f2fe',
+              color: '#0369a1',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              {getInitials(claim.name)}
+            </div>
+            <div>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: 0 }}>{claim.name}</h3>
+              <p style={{ fontSize: 13.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                <Building2 size={14} />
+                {claim.organization || 'No Organization'}
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+            {/* Quick Metrics */}
+            <div style={{ background: '#f8fafc', padding: 12, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Quiz Score</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: '#0f172a' }}>{claim.score} / {claim.totalQuestions}</span>
+                <span style={{ fontSize: 12, color: '#059669', background: '#dcfce7', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
+                  {claim.totalQuestions > 0 ? ((claim.score / claim.totalQuestions) * 100).toFixed(0) : 0}%
+                </span>
+              </div>
+            </div>
+
+            <div style={{ background: '#f8fafc', padding: 12, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>Progress Context</div>
+              <div style={{ display: 'flex', gap: 12, fontSize: 14, fontWeight: 600, color: '#334155', marginTop: 4 }}>
+                <div>Level: <span style={{ color: '#0f172a' }}>{claim.level ?? '—'}</span></div>
+                <div style={{ color: '#cbd5e1' }}>|</div>
+                <div>Attempt: <span style={{ color: '#0f172a' }}>{claim.attempt ?? '—'}</span></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Contact Details */}
+          <div style={{ marginBottom: 24 }}>
+            <h4 style={{ fontSize: 13, fontWeight: 600, color: '#475569', textTransform: 'uppercase', marginBottom: 12, borderBottom: '1px solid #f1f5f9', paddingBottom: 6 }}>Contact Information</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ color: '#94a3b8' }}><Mail size={16} /></div>
+                <div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>Email Address</div>
+                  <a href={`mailto:${claim.email}`} style={{ fontSize: 14, color: '#1a73e8', textDecoration: 'none', fontWeight: 500 }}>{claim.email}</a>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ color: '#94a3b8' }}><Phone size={16} /></div>
+                <div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>Phone Number</div>
+                  <a href={`tel:${claim.phone}`} style={{ fontSize: 14, color: '#1a73e8', textDecoration: 'none', fontWeight: 500 }}>{claim.phone}</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Collected Info */}
+          {(claim.helpWith || claim.userDescription) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {claim.helpWith && (
+                <div>
+                  <h4 style={{ fontSize: 13, fontWeight: 600, color: '#475569', textTransform: 'uppercase', marginBottom: 10, borderBottom: '1px solid #f1f5f9', paddingBottom: 6 }}>Help Requested With</h4>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {claim.helpWith.split(',').map((item, idx) => (
+                      <span key={idx} style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        backgroundColor: '#eff6ff',
+                        color: '#1d4ed8',
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        border: '1px solid #bfdbfe'
+                      }}>
+                        {item.trim()}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {claim.userDescription && (
+                <div>
+                  <h4 style={{ fontSize: 13, fontWeight: 600, color: '#475569', textTransform: 'uppercase', marginBottom: 8, borderBottom: '1px solid #f1f5f9', paddingBottom: 6 }}>User Description</h4>
+                  <div style={{
+                    fontSize: 13.5,
+                    color: '#334155',
+                    backgroundColor: '#f8fafc',
+                    padding: '12px 16px',
+                    borderRadius: 8,
+                    borderLeft: '4px solid #94a3b8',
+                    fontStyle: 'italic',
+                    lineHeight: '1.5'
+                  }}>
+                    "{claim.userDescription}"
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Date info */}
+          <div style={{ marginTop: 24, fontSize: 12, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Calendar size={13} />
+            Submitted on {format(new Date(claim.createdAt), 'MMMM dd, yyyy @ hh:mm a')}
+          </div>
+        </div>
+        <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+          <div>
+            {!claim.isConverted && (
+              <span style={{ fontSize: 12, color: '#64748b' }}>Not yet converted to CRM Lead</span>
+            )}
+            {claim.isConverted && (
+              <span style={{ fontSize: 12, color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Check size={14} /> Already Converted
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn-secondary" onClick={onClose}>Close</button>
+            <button 
+              type="button" 
+              className="btn-primary" 
+              onClick={() => {
+                onConvert(claim);
+                onClose();
+              }}
+            >
+              <UserPlus size={15} /> Convert to Lead
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function QuizUsersPage() {
   const [claims, setClaims] = useState<QuizUser[]>([]);
@@ -156,6 +338,7 @@ export default function QuizUsersPage() {
   
   // Lead creation modal state
   const [leadModal, setLeadModal] = useState<{ open: boolean; initialData?: any }>({ open: false });
+  const [selectedClaim, setSelectedClaim] = useState<QuizUser | null>(null);
 
   const fetchClaims = useCallback(async () => {
     setLoading(true);
@@ -198,6 +381,12 @@ export default function QuizUsersPage() {
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '—';
 
+    let reasonParts = [`Converted from Quiz App submission. Scored ${claim.score}/${claim.totalQuestions}.`];
+    if (claim.level !== undefined) reasonParts.push(`Level: ${claim.level}`);
+    if (claim.attempt !== undefined) reasonParts.push(`Attempt: ${claim.attempt}`);
+    if (claim.helpWith) reasonParts.push(`Help requested with: ${claim.helpWith}`);
+    if (claim.userDescription) reasonParts.push(`User description: ${claim.userDescription}`);
+
     setLeadModal({
       open: true,
       initialData: {
@@ -206,7 +395,7 @@ export default function QuizUsersPage() {
         email: claim.email,
         phone: claim.phone,
         company: claim.organization || '',
-        reason: `Converted from Quiz App submission. Scored ${claim.score}/${claim.totalQuestions}.`
+        reason: reasonParts.join('\n')
       }
     });
   };
@@ -352,7 +541,16 @@ export default function QuizUsersPage() {
                         </div>
                       </td>
                       <td>
-                        {getScoreBadge(claim.score, claim.totalQuestions)}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <div>{getScoreBadge(claim.score, claim.totalQuestions)}</div>
+                          {(claim.level !== undefined || claim.attempt !== undefined) && (
+                            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+                              {claim.level !== undefined && `Lvl ${claim.level}`}
+                              {claim.level !== undefined && claim.attempt !== undefined && ' • '}
+                              {claim.attempt !== undefined && `Attempt ${claim.attempt}`}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#475569', fontSize: 13.5, fontWeight: 500 }}>
@@ -380,6 +578,24 @@ export default function QuizUsersPage() {
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 8 }}>
+                          <button
+                            onClick={() => setSelectedClaim(claim)}
+                            style={{
+                              padding: '6px 10px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              background: '#f1f5f9',
+                              color: '#475569',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: 8,
+                              transition: 'background-color 0.2s'
+                            }}
+                            title="View Full Details"
+                          >
+                            <Eye size={14} />
+                          </button>
                           <button
                             onClick={() => handleConvertClick(claim)}
                             style={{
@@ -426,11 +642,20 @@ export default function QuizUsersPage() {
       {/* Render Lead Creation Modal */}
       {leadModal.open && (
         <CreateLeadModal 
-          initialData={leadModal.initialData}
+          initialData={leadModal.open ? leadModal.initialData : undefined}
           onClose={() => setLeadModal({ open: false })}
           onCreated={() => {
             fetchClaims();
           }}
+        />
+      )}
+
+      {/* Render Quiz User Details Modal */}
+      {selectedClaim && (
+        <QuizUserDetailsModal
+          claim={selectedClaim}
+          onClose={() => setSelectedClaim(null)}
+          onConvert={handleConvertClick}
         />
       )}
     </ProtectedLayout>

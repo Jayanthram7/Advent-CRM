@@ -122,14 +122,14 @@ export function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }:
 
 
   const fetchNotes = useCallback(() => {
-    api.get(`/leads/${lead._id}/notes`).then(r => setNotes(r.data)).catch(() => {});
+    api.get(`/leads/${lead._id}/notes`).then(r => setNotes(r.data)).catch(() => { });
   }, [lead._id]);
 
   const fetchActivities = useCallback(() => {
     setActivitiesLoading(true);
     api.get(`/leads/${lead._id}/activities`)
       .then(r => setActivities(r.data))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setActivitiesLoading(false));
   }, [lead._id]);
 
@@ -161,18 +161,18 @@ export function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }:
       toast.error('No phone number available');
       return;
     }
-    
+
     // Clean phone number (remove +, spaces, etc.)
     const cleanPhone = lead.phone.replace(/\D/g, '');
     const message = encodeURIComponent(`Hi ${lead.firstName}, this is from Advent Systems regarding your inquiry...`);
     const waUrl = `https://wa.me/${cleanPhone}?text=${message}`;
-    
+
     try {
       const response = await api.post('/whatsapp/send-template', {
         phoneNumber: cleanPhone,
         recipientName: lead.firstName
       });
-      
+
       if (response.data && response.data.success) {
         toast.success('WhatsApp template sent automatically via Meta Cloud API!');
         await api.post(`/leads/${lead._id}/whatsapp-log`);
@@ -183,7 +183,7 @@ export function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }:
         api.post(`/leads/${lead._id}/whatsapp-log`).then(() => {
           fetchActivities();
           onRefresh();
-        }).catch(() => {});
+        }).catch(() => { });
         window.open(waUrl, '_blank');
       }
     } catch (err) {
@@ -191,7 +191,7 @@ export function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }:
       api.post(`/leads/${lead._id}/whatsapp-log`).then(() => {
         fetchActivities();
         onRefresh();
-      }).catch(() => {});
+      }).catch(() => { });
       window.open(waUrl, '_blank');
     }
   };
@@ -201,18 +201,18 @@ export function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }:
       toast.error('No email address available');
       return;
     }
-    
+
     const subject = encodeURIComponent('Inquiry from Advent Systems');
     const body = encodeURIComponent(`Hi ${lead.firstName},\n\nThis is regarding your inquiry with Advent Systems...`);
-    
+
     // Direct Gmail compose link
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${lead.email}&su=${subject}&body=${body}`;
-    
+
     // Log activity in background
     api.post(`/leads/${lead._id}/email-log`).then(() => {
       fetchActivities();
       onRefresh();
-    }).catch(() => {});
+    }).catch(() => { });
 
     window.open(gmailUrl, '_blank');
   };
@@ -268,14 +268,14 @@ export function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }:
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {lead.phone && (
-                <button 
+                <button
                   onClick={handleWhatsApp}
                   title="Contact via WhatsApp"
-                  style={{ 
-                    background: '#25D366', 
-                    color: 'white', 
-                    border: 'none', 
-                    borderRadius: 8, 
+                  style={{
+                    background: '#25D366',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 8,
                     padding: '8px 12px',
                     display: 'flex',
                     alignItems: 'center',
@@ -294,14 +294,14 @@ export function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }:
                 </button>
               )}
               {lead.email && (
-                <button 
+                <button
                   onClick={handleEmail}
                   title="Contact via Email"
-                  style={{ 
-                    background: '#EBF5FF', 
-                    color: '#0070F3', 
-                    border: '1px solid #D1E9FF', 
-                    borderRadius: 8, 
+                  style={{
+                    background: '#EBF5FF',
+                    color: '#0070F3',
+                    border: '1px solid #D1E9FF',
+                    borderRadius: 8,
                     padding: '8px 12px',
                     display: 'flex',
                     alignItems: 'center',
@@ -410,10 +410,10 @@ export function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }:
                   </div>
 
                   {isUpdatingCallback && (
-                    <div style={{ 
-                      background: 'rgba(255, 255, 255, 0.6)', 
-                      borderRadius: 8, 
-                      padding: 12, 
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.6)',
+                      borderRadius: 8,
+                      padding: 12,
                       border: '1px dashed #bfdbfe',
                       display: 'flex',
                       flexDirection: 'column',
@@ -549,10 +549,10 @@ export function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }:
                   </div>
 
                   {isUpdatingFollowUp && (
-                    <div style={{ 
-                      background: 'rgba(255, 255, 255, 0.6)', 
-                      borderRadius: 8, 
-                      padding: 12, 
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.6)',
+                      borderRadius: 8,
+                      padding: 12,
                       border: '1px dashed #fde68a',
                       display: 'flex',
                       flexDirection: 'column',
@@ -768,11 +768,11 @@ export function LeadDrawer({ lead, defaultTab = 'details', onClose, onRefresh }:
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0, position: 'relative' }}>
                   {/* Timeline vertical line */}
                   <div style={{ position: 'absolute', left: 7, top: 10, bottom: 10, width: 2, background: '#f0f2f7', zIndex: 0 }} />
-                  
+
                   {activities.map((act, i) => (
                     <div key={act._id} style={{ display: 'flex', gap: 16, marginBottom: 24, position: 'relative', zIndex: 1 }}>
-                      <div style={{ 
-                        width: 16, height: 16, borderRadius: '50%', 
+                      <div style={{
+                        width: 16, height: 16, borderRadius: '50%',
                         background: act.type === 'Creation' ? '#10b981' : act.type === 'Conversion' ? '#8b5cf6' : act.type === 'WhatsApp' ? '#25D366' : act.type === 'Email' ? '#0070F3' : act.type === 'DateUpdate' ? '#f59e0b' : '#e2e8f0',
                         border: '4px solid white', boxShadow: '0 0 0 1px #f0f2f7', flexShrink: 0, marginTop: 4
                       }} />
@@ -1058,7 +1058,7 @@ function NotePanel({ leadId, onClose }: { leadId: string; onClose: () => void })
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.get(`/leads/${leadId}/notes`).then(r => setNotes(r.data)).catch(() => {});
+    api.get(`/leads/${leadId}/notes`).then(r => setNotes(r.data)).catch(() => { });
   }, [leadId]);
 
   const addNote = async () => {
@@ -1269,20 +1269,20 @@ function RowMenu({ lead, onRefresh, users }: { lead: Lead; onRefresh: () => void
                 {users.length === 0 ? (
                   <p style={{ fontSize: 12, color: '#9ca3af', padding: '10px 0' }}>No users found</p>
                 ) : users.map(u => (
-                  <div 
-                    key={u._id} 
-                    className="dropdown-item" 
+                  <div
+                    key={u._id}
+                    className="dropdown-item"
                     onClick={() => assignLead(u._id)}
-                    style={{ 
-                      fontSize: 13, 
+                    style={{
+                      fontSize: 13,
                       padding: '8px 10px',
                       background: lead.assignedTo?._id === u._id ? '#f0f7ff' : 'transparent',
                       color: lead.assignedTo?._id === u._id ? '#1a73e8' : 'inherit'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ 
-                        width: 24, height: 24, borderRadius: '50%', background: '#e2e8f0', 
+                      <div style={{
+                        width: 24, height: 24, borderRadius: '50%', background: '#e2e8f0',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700
                       }}>
                         {u.name.split(' ').map((n: string) => n[0]).join('')}
@@ -1362,7 +1362,7 @@ function LeadsPageContent() {
   }, [isAdmin, leads]);
 
   useEffect(() => {
-    api.get('/users').then(r => setUsers(r.data)).catch(() => {});
+    api.get('/users').then(r => setUsers(r.data)).catch(() => { });
   }, []);
 
   // Update search state if URL search param changes
@@ -1393,11 +1393,11 @@ function LeadsPageContent() {
 
       // Apply view-based filters
       const activeView = viewFilter || urlView;
-      if (activeView === 'open')         { params.label = 'Open'; }
-      if (activeView === 'followup')     { params.label = 'Follow Up'; }
-      if (activeView === 'dateset')      { params.dateSet = 'true'; }
+      if (activeView === 'open') { params.label = 'Open'; }
+      if (activeView === 'followup') { params.label = 'Follow Up'; }
+      if (activeView === 'dateset') { params.dateSet = 'true'; }
       if (activeView === 'installation') { params.installation = 'true'; }
-      if (activeView === 'completed')    { params.converted = 'true'; }
+      if (activeView === 'completed') { params.converted = 'true'; }
 
       const res = await api.get('/leads', { params });
       setLeads(res.data.leads);
@@ -1493,9 +1493,9 @@ function LeadsPageContent() {
         </div>
       </TopBar>
       {showAnalytics && (
-        <AnalyticsModal 
-          section="leads" 
-          onClose={() => setShowAnalytics(false)} 
+        <AnalyticsModal
+          section="leads"
+          onClose={() => setShowAnalytics(false)}
           onViewRecord={(name) => {
             setSearch(name);
             setPage(1);
@@ -1571,22 +1571,22 @@ function LeadsPageContent() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input 
-                type="date" 
-                value={startDate} 
-                onChange={e => { setStartDate(e.target.value); setPage(1); }} 
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => { setStartDate(e.target.value); setPage(1); }}
                 style={{ padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white', color: '#374151', height: 38 }}
               />
               <span style={{ fontSize: 12, color: '#9ca3af' }}>to</span>
-              <input 
-                type="date" 
-                value={endDate} 
-                onChange={e => { setEndDate(e.target.value); setPage(1); }} 
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => { setEndDate(e.target.value); setPage(1); }}
                 style={{ padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white', color: '#374151', height: 38 }}
               />
               {(startDate || endDate) && (
-                <button 
-                  onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }} 
+                <button
+                  onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}
                   style={{ background: '#fee2e2', border: 'none', color: '#b91c1c', padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, height: 38 }}
                 >
                   Clear
@@ -1650,7 +1650,7 @@ function LeadsPageContent() {
                         <td>
                           {lead.assignedTo ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <div style={{ 
+                              <div style={{
                                 width: 22, height: 22, borderRadius: '50%', background: '#e0e7ff', color: '#4338ca',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700
                               }}>
@@ -1703,7 +1703,7 @@ function LeadsPageContent() {
                             ) : null}
 
                             {(lead.noteCount || 0) > 0 && (
-                              <button 
+                              <button
                                 onClick={(e) => { e.stopPropagation(); setSelectedLead(lead); setDrawerTab('notes'); }}
                                 style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', padding: '3px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
                                 title={`${lead.noteCount} Note(s)`}

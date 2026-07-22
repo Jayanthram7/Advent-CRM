@@ -22,6 +22,14 @@ const claimSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  userDescription: {
+    type: String,
+    trim: true
+  },
+  helpWith: {
+    type: String,
+    trim: true
+  },
   score: {
     type: Number,
     required: true
@@ -29,6 +37,12 @@ const claimSchema = new mongoose.Schema({
   totalQuestions: {
     type: Number,
     required: true
+  },
+  level: {
+    type: Number
+  },
+  attempt: {
+    type: Number
   }
 }, { 
   timestamps: { createdAt: true, updatedAt: false }

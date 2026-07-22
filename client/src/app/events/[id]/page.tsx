@@ -177,7 +177,7 @@ export function EventDrawer({ record, defaultTab = 'details', onClose, onRefresh
         phoneNumber: cleanPhone,
         recipientName: record.contactPerson
       });
-      
+
       if (response.data && response.data.success) {
         toast.success('WhatsApp template sent automatically via Meta Cloud API!');
         await api.post(`/events/records/${record._id}/whatsapp-log`);
@@ -188,7 +188,7 @@ export function EventDrawer({ record, defaultTab = 'details', onClose, onRefresh
         api.post(`/events/records/${record._id}/whatsapp-log`).then(() => {
           fetchActivities();
           onRefresh();
-        }).catch(() => {});
+        }).catch(() => { });
         window.open(waUrl, '_blank');
       }
     } catch (err) {
@@ -196,7 +196,7 @@ export function EventDrawer({ record, defaultTab = 'details', onClose, onRefresh
       api.post(`/events/records/${record._id}/whatsapp-log`).then(() => {
         fetchActivities();
         onRefresh();
-      }).catch(() => {});
+      }).catch(() => { });
       window.open(waUrl, '_blank');
     }
   };
@@ -976,7 +976,7 @@ function ImportEventRecordsModal({ datasetId, onClose, onImported }: { datasetId
     try {
       const XLSX = await import('xlsx');
       const reader = new FileReader();
-      
+
       reader.onload = async (e) => {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
@@ -1614,11 +1614,11 @@ function EventPageContent({ id }: { id: string }) {
           </div>
         </TopBar>
         {showAnalytics && (
-          <AnalyticsModal 
-            section="events" 
-            datasetId={id} 
-            datasetName={datasetName} 
-            onClose={() => setShowAnalytics(false)} 
+          <AnalyticsModal
+            section="events"
+            datasetId={id}
+            datasetName={datasetName}
+            onClose={() => setShowAnalytics(false)}
             onViewRecord={(name) => {
               setSearch(name);
               setPage(1);

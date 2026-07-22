@@ -155,8 +155,8 @@ function RowMenu({ record, onRefresh, users }: { record: TssRecord; onRefresh: (
               {record.status !== 'Closed' && user?.role === 'Admin' && (
                 <div className="dropdown-item" onClick={e => { e.stopPropagation(); closeRecord(); }}><CheckCircle size={14} />Mark as Completed</div>
               )}
-              <div 
-                className="dropdown-item" 
+              <div
+                className="dropdown-item"
                 onClick={e => { e.stopPropagation(); if (!sendingReminder) sendReminder(); }}
                 style={{ opacity: sendingReminder ? 0.6 : 1, cursor: sendingReminder ? 'not-allowed' : 'pointer' }}
               >
@@ -277,7 +277,7 @@ export function RecordDrawer({ record, defaultTab = 'details', onClose, onRefres
         phoneNumber: cleanPhone,
         recipientName: record.customerName || ''
       });
-      
+
       if (response.data && response.data.success) {
         toast.success('WhatsApp template sent automatically via Meta Cloud API!');
       } else {
@@ -319,7 +319,7 @@ export function RecordDrawer({ record, defaultTab = 'details', onClose, onRefres
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 150, backdropFilter: 'blur(2px)', animation: 'fadeIn 0.2s ease' }} />
       <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 480, background: 'white', boxShadow: '-8px 0 40px rgba(0,0,0,0.15)', zIndex: 160, display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.25s cubic-bezier(0.4, 0, 0.2, 1)' }}>
-        
+
         <div style={{ padding: '20px 24px 0', borderBottom: '1px solid #f0f2f7' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -339,14 +339,14 @@ export function RecordDrawer({ record, defaultTab = 'details', onClose, onRefres
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {record.mobileNumber && (
-                <button 
+                <button
                   onClick={handleWhatsApp}
                   title="Contact via WhatsApp"
-                  style={{ 
-                    background: '#25D366', 
-                    color: 'white', 
-                    border: 'none', 
-                    borderRadius: 8, 
+                  style={{
+                    background: '#25D366',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 8,
                     padding: '6px 10px',
                     display: 'flex',
                     alignItems: 'center',
@@ -365,14 +365,14 @@ export function RecordDrawer({ record, defaultTab = 'details', onClose, onRefres
                 </button>
               )}
               {getEmailFromRecord(record) && (
-                <button 
+                <button
                   onClick={handleEmail}
                   title="Contact via Email"
-                  style={{ 
-                    background: '#EBF5FF', 
-                    color: '#0070F3', 
-                    border: '1px solid #D1E9FF', 
-                    borderRadius: 8, 
+                  style={{
+                    background: '#EBF5FF',
+                    color: '#0070F3',
+                    border: '1px solid #D1E9FF',
+                    borderRadius: 8,
                     padding: '6px 10px',
                     display: 'flex',
                     alignItems: 'center',
@@ -466,7 +466,7 @@ export function RecordDrawer({ record, defaultTab = 'details', onClose, onRefres
               <InfoRow label="Release Version" value={record.releaseVersion || record.data?.Release || record.data?.['Release Version']} />
               <InfoRow label="Flavour" value={record.flavour} />
               <InfoRow label="Mobile Number" value={record.mobileNumber} />
-              
+
               <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b', marginBottom: 16, marginTop: 32 }}>Additional Data</div>
               {Object.entries(record.data || {}).map(([key, val]) => (
                 <InfoRow key={key} label={key} value={val} />
@@ -583,7 +583,7 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const initialSearch = searchParams ? (searchParams.get('search') || '') : '';
-  
+
   const [records, setRecords] = useState<TssRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -620,7 +620,7 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
       return next;
     });
   };
-  
+
   const [selectedRecord, setSelectedRecord] = useState<TssRecord | null>(null);
   const [drawerTab, setDrawerTab] = useState<'details' | 'notes'>('details');
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -643,12 +643,12 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
       const params: Record<string, any> = { page: p, limit: 50, search: q, view: v };
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
-      
+
       const res = await api.get(`/tss/datasets/${id}/records`, { params });
       setRecords(res.data.records);
       setTotalPages(res.data.pages);
       setTotalRecords(res.data.total);
-      
+
       if (selectedRecord) {
         const updated = res.data.records.find((r: TssRecord) => r._id === selectedRecord._id);
         if (updated) setSelectedRecord(updated);
@@ -727,7 +727,7 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
             </button>
           )}
         </TopBar>
-        
+
         <div style={{ padding: '24px 32px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: '0 0 4px 0' }}>Dataset Records</h1>
@@ -753,37 +753,37 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
               ))}
             </div>
 
-             <div style={{ position: 'relative' }}>
-               <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-               <input
-                 type="text" placeholder="Search..." value={search} onChange={handleSearch}
-                 style={{ padding: '9px 12px 9px 34px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, width: 220, outline: 'none', background: 'white' }}
-               />
-             </div>
+            <div style={{ position: 'relative' }}>
+              <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input
+                type="text" placeholder="Search..." value={search} onChange={handleSearch}
+                style={{ padding: '9px 12px 9px 34px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, width: 220, outline: 'none', background: 'white' }}
+              />
+            </div>
 
-             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-               <input 
-                 type="date" 
-                 value={startDate} 
-                 onChange={e => { setStartDate(e.target.value); setPage(1); }} 
-                 style={{ padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white', color: '#374151', height: 38 }}
-               />
-               <span style={{ fontSize: 12, color: '#9ca3af' }}>to</span>
-               <input 
-                 type="date" 
-                 value={endDate} 
-                 onChange={e => { setEndDate(e.target.value); setPage(1); }} 
-                 style={{ padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white', color: '#374151', height: 38 }}
-               />
-               {(startDate || endDate) && (
-                 <button 
-                   onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }} 
-                   style={{ background: '#fee2e2', border: 'none', color: '#b91c1c', padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, height: 38 }}
-                 >
-                   Clear
-                 </button>
-               )}
-             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => { setStartDate(e.target.value); setPage(1); }}
+                style={{ padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white', color: '#374151', height: 38 }}
+              />
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => { setEndDate(e.target.value); setPage(1); }}
+                style={{ padding: '8px 10px', fontSize: 13, border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none', background: 'white', color: '#374151', height: 38 }}
+              />
+              {(startDate || endDate) && (
+                <button
+                  onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}
+                  style={{ background: '#fee2e2', border: 'none', color: '#b91c1c', padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, height: 38 }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
 
             <button
               onClick={() => {
@@ -846,10 +846,10 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
                         onMouseOver={e => e.currentTarget.style.background = '#f1f5f9'} onMouseOut={e => e.currentTarget.style.background = i % 2 === 0 ? 'white' : '#fcfcfd'}
                       >
                         <td style={{ padding: '12px 12px', width: 40 }} onClick={e => e.stopPropagation()}>
-                          <input 
-                            type="checkbox" 
-                            checked={!!tickedIds[r._id]} 
-                            onChange={() => handleToggleTick(r._id)} 
+                          <input
+                            type="checkbox"
+                            checked={!!tickedIds[r._id]}
+                            onChange={() => handleToggleTick(r._id)}
                             style={{ cursor: 'pointer' }}
                           />
                         </td>
@@ -869,16 +869,16 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
                         </td>
                         <td style={{ padding: '12px 12px' }}>
                           <div style={{ display: 'flex', gap: 4 }}>
-                            {r.renewalDate && <span title={`Renewal: ${format(new Date(r.renewalDate), 'MMM d')}`} style={{ background: '#dcfce7', color: '#166534', padding: '4px 6px', borderRadius: 6, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={12}/> {format(new Date(r.renewalDate), 'MMM d')}</span>}
-                            {r.followUpDate && !r.renewalDate && <span title={`Follow Up: ${format(new Date(r.followUpDate), 'MMM d')}`} style={{ background: '#fef9c3', color: '#854d0e', padding: '4px 6px', borderRadius: 6, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={12}/> {format(new Date(r.followUpDate), 'MMM d')}</span>}
+                            {r.renewalDate && <span title={`Renewal: ${format(new Date(r.renewalDate), 'MMM d')}`} style={{ background: '#dcfce7', color: '#166534', padding: '4px 6px', borderRadius: 6, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={12} /> {format(new Date(r.renewalDate), 'MMM d')}</span>}
+                            {r.followUpDate && !r.renewalDate && <span title={`Follow Up: ${format(new Date(r.followUpDate), 'MMM d')}`} style={{ background: '#fef9c3', color: '#854d0e', padding: '4px 6px', borderRadius: 6, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={12} /> {format(new Date(r.followUpDate), 'MMM d')}</span>}
                             {(r.notes?.length || 0) > 0 && (
-                               <button 
-                                 onClick={(e) => { e.stopPropagation(); setSelectedRecord(r); setDrawerTab('notes'); }}
-                                 style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', padding: '3px 6px', borderRadius: 6, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
-                                 title={`${r.notes?.length} Note(s)`}
-                               >
-                                 <FileText size={12} /> {r.notes?.length}
-                               </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedRecord(r); setDrawerTab('notes'); }}
+                                style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', padding: '3px 6px', borderRadius: 6, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                                title={`${r.notes?.length} Note(s)`}
+                              >
+                                <FileText size={12} /> {r.notes?.length}
+                              </button>
                             )}
                           </div>
                         </td>
@@ -905,13 +905,13 @@ export default function TssDatasetPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
       </div>
-      
+
       {selectedRecord && <RecordDrawer record={selectedRecord} defaultTab={drawerTab} onClose={() => setSelectedRecord(null)} onRefresh={() => fetchRecords()} />}
       {showAnalytics && (
-        <AnalyticsModalComponent 
-          section="tss" 
-          datasetId={id} 
-          onClose={() => setShowAnalytics(false)} 
+        <AnalyticsModalComponent
+          section="tss"
+          datasetId={id}
+          onClose={() => setShowAnalytics(false)}
           onViewRecord={(name) => {
             setSearch(name);
             setPage(1);

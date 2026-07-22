@@ -9,7 +9,7 @@ const roleMiddleware = require('../middleware/roleMiddleware');
 // POST /api/claims
 router.post('/', async (req, res) => {
   try {
-    const { name, phone, email, organization, score, totalQuestions } = req.body;
+    const { name, phone, email, organization, score, totalQuestions, userDescription, helpWith, level, attempt } = req.body;
     
     // Basic validation
     if (!name || !phone || !email || organization === undefined || score === undefined || totalQuestions === undefined) {
@@ -25,7 +25,11 @@ router.post('/', async (req, res) => {
         email: email.toLowerCase().trim(), 
         organization: organization.trim(), 
         score: Number(score), 
-        totalQuestions: Number(totalQuestions) 
+        totalQuestions: Number(totalQuestions),
+        userDescription: userDescription ? userDescription.trim() : undefined,
+        helpWith: helpWith ? helpWith.trim() : undefined,
+        level: level !== undefined ? Number(level) : undefined,
+        attempt: attempt !== undefined ? Number(attempt) : undefined
       },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
@@ -50,7 +54,9 @@ router.get('/', authMiddleware, roleMiddleware('Admin'), async (req, res) => {
           { name: searchRegex },
           { email: searchRegex },
           { phone: searchRegex },
-          { organization: searchRegex }
+          { organization: searchRegex },
+          { userDescription: searchRegex },
+          { helpWith: searchRegex }
         ]
       };
     }
