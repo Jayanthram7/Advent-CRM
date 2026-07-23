@@ -12,6 +12,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [adminOtp, setAdminOtp] = useState('');
   const [emailOtp, setEmailOtp] = useState('');
+  const [adminOtpError, setAdminOtpError] = useState('');
+  const [emailOtpError, setEmailOtpError] = useState('');
   const [step, setStep] = useState<'login' | 'otp' | 'email-otp'>('login');
   const [tempUserId, setTempUserId] = useState('');
   const [maskedEmail, setMaskedEmail] = useState('');
@@ -57,6 +59,7 @@ export default function LoginPage() {
     e.preventDefault();
     if (!adminOtp) { toast.error('Please enter the admin OTP'); return; }
     setLoading(true);
+    setAdminOtpError('');
     try {
       const data = await verifyOtp(tempUserId, adminOtp);
       if (data.emailOtpRequired) {
@@ -67,7 +70,8 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
-      toast.error(error?.response?.data?.message || 'Invalid admin OTP');
+      setAdminOtpError(error?.response?.data?.message || 'Wrong OTP');
+      setAdminOtp(''); // Clear input to let them enter the correct OTP
     } finally {
       setLoading(false);
     }
@@ -77,13 +81,15 @@ export default function LoginPage() {
     e.preventDefault();
     if (!emailOtp) { toast.error('Please enter the email OTP'); return; }
     setLoading(true);
+    setEmailOtpError('');
     try {
       await verifyEmailOtp(tempUserId, emailOtp);
       toast.success('Welcome back!');
       router.push('/home');
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
-      toast.error(error?.response?.data?.message || 'Invalid email OTP');
+      setEmailOtpError(error?.response?.data?.message || 'Wrong OTP');
+      setEmailOtp(''); // Clear input to let them enter the correct OTP
     } finally {
       setLoading(false);
     }
@@ -227,14 +233,30 @@ export default function LoginPage() {
                   </div>
 
                   <div style={{ position: 'relative' }}>
-                    <Lock size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+                    <Lock size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: adminOtpError ? '#ef4444' : '#9ca3af' }} />
                     <input
                       id="otp-input" type="text" autoFocus maxLength={6}
-                      style={{ ...inputStyle, textAlign: 'center', letterSpacing: '0.4em', fontWeight: 800, fontSize: 20 }}
+                      style={{ 
+                        ...inputStyle, 
+                        textAlign: 'center', 
+                        letterSpacing: '0.4em', 
+                        fontWeight: 800, 
+                        fontSize: 20,
+                        border: adminOtpError ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                        boxShadow: adminOtpError ? '0 0 0 2px rgba(239, 68, 68, 0.15)' : 'none'
+                      }}
                       placeholder="000000" value={adminOtp}
-                      onChange={e => setAdminOtp(e.target.value.replace(/\D/g, ''))} required
+                      onChange={e => {
+                        setAdminOtp(e.target.value.replace(/\D/g, ''));
+                        if (adminOtpError) setAdminOtpError('');
+                      }} required
                     />
                   </div>
+                  {adminOtpError && (
+                    <div style={{ color: '#ef4444', fontSize: '12.5px', marginTop: '-4px', textAlign: 'center', fontWeight: 500 }}>
+                      {adminOtpError}
+                    </div>
+                  )}
 
                   <button id="otp-submit" type="submit" disabled={loading} style={btnPrimary('#0f172a')}
                     onMouseOver={e => !loading && (e.currentTarget.style.transform = 'translateY(-1px)')}
@@ -243,7 +265,7 @@ export default function LoginPage() {
                     {loading ? <><div className="spinner" style={{ width: 16, height: 16, borderLeftColor: 'transparent' }} />Verifying...</> : 'Verify Admin OTP →'}
                   </button>
 
-                  <button type="button" onClick={() => setStep('login')} style={{ background: 'none', border: 'none', color: '#6b7280', fontSize: 13, cursor: 'pointer', marginTop: 4, textDecoration: 'underline', alignSelf: 'center' }}>
+                  <button type="button" onClick={() => { setStep('login'); setAdminOtp(''); setAdminOtpError(''); }} style={{ background: 'none', border: 'none', color: '#6b7280', fontSize: 13, cursor: 'pointer', marginTop: 4, textDecoration: 'underline', alignSelf: 'center' }}>
                     ← Back to login
                   </button>
                 </form>
@@ -270,14 +292,30 @@ export default function LoginPage() {
                   </div>
 
                   <div style={{ position: 'relative' }}>
-                    <Mail size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+                    <Mail size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: emailOtpError ? '#ef4444' : '#9ca3af' }} />
                     <input
                       id="email-otp-input" type="text" autoFocus maxLength={6}
-                      style={{ ...inputStyle, textAlign: 'center', letterSpacing: '0.4em', fontWeight: 800, fontSize: 20 }}
+                      style={{ 
+                        ...inputStyle, 
+                        textAlign: 'center', 
+                        letterSpacing: '0.4em', 
+                        fontWeight: 800, 
+                        fontSize: 20,
+                        border: emailOtpError ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                        boxShadow: emailOtpError ? '0 0 0 2px rgba(239, 68, 68, 0.15)' : 'none'
+                      }}
                       placeholder="000000" value={emailOtp}
-                      onChange={e => setEmailOtp(e.target.value.replace(/\D/g, ''))} required
+                      onChange={e => {
+                        setEmailOtp(e.target.value.replace(/\D/g, ''));
+                        if (emailOtpError) setEmailOtpError('');
+                      }} required
                     />
                   </div>
+                  {emailOtpError && (
+                    <div style={{ color: '#ef4444', fontSize: '12.5px', marginTop: '-4px', textAlign: 'center', fontWeight: 500 }}>
+                      {emailOtpError}
+                    </div>
+                  )}
 
                   <button id="email-otp-submit" type="submit" disabled={loading} style={btnPrimary('#0284c7')}
                     onMouseOver={e => !loading && (e.currentTarget.style.transform = 'translateY(-1px)')}
@@ -296,7 +334,7 @@ export default function LoginPage() {
                     {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend email OTP'}
                   </button>
 
-                  <button type="button" onClick={() => { setStep('otp'); setEmailOtp(''); }} style={{ background: 'none', border: 'none', color: '#6b7280', fontSize: 13, cursor: 'pointer', textDecoration: 'underline', alignSelf: 'center' }}>
+                  <button type="button" onClick={() => { setStep('otp'); setEmailOtp(''); setEmailOtpError(''); }} style={{ background: 'none', border: 'none', color: '#6b7280', fontSize: 13, cursor: 'pointer', textDecoration: 'underline', alignSelf: 'center' }}>
                     ← Back to admin OTP
                   </button>
                 </form>
